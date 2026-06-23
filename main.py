@@ -60,6 +60,10 @@ class CatchMyHands:
         self.fps_counter = FPSCounter()
         self.frame_count = 0
         self.start_time = None
+        self._last_frame = None  # Dernière frame pour le screenshot
+        # Cooldown pour le geste FIST (évite l'effacement en boucle)
+        self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
+        self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
 
     def run(self):
         """Lance la boucle principale."""
@@ -112,6 +116,7 @@ class CatchMyHands:
 
                 # ── Affichage ──
                 cv2.imshow("CatchMyHands", frame)
+                self._last_frame = frame  # Sauvegarder pour screenshot
                 self.fps_counter.tick()
                 self.frame_count += 1
 
@@ -178,10 +183,17 @@ class CatchMyHands:
                 edge_factor
             )
 
-        # Effet clear canvas (poing fermé)
+        # Effet clear canvas (poing fermé) — avec cooldown anti-boucle
         if gesture.gesture_type == GestureType.FIST:
-            if gesture.confidence > 0.8:
+            cooldown = self._fist_cooldown.get(hand_idx, 0)
+            if cooldown <= 0 and gesture.confidence > 0.8:
                 self.drawing.clear()
+                self._fist_cooldown[hand_idx] = self._FIST_COOLDOWN_FRAMES
+            elif cooldown > 0:
+                self._fist_cooldown[hand_idx] = cooldown - 1
+        else:
+            # Reset le cooldown quand le poing est relâché
+            self._fist_cooldown[hand_idx] = 0
 
         # Rendu du dessin (toujours, pour les trails persistants)
         frame = self.drawing.render(frame)
@@ -278,12 +290,17 @@ class CatchMyHands:
         return True
 
     def _take_screenshot(self):
-        """Sauvegarde le frame actuel en PNG."""
+        """Sauvegarde le frame actuel en PNG dans le dossier screenshots/."""
+        if self._last_frame is None:
+            print("[Screenshot] Aucune frame disponible.")
+            return
         os.makedirs("screenshots", exist_ok=True)
         filename = f"screenshots/catch_{int(time.time())}.png"
-        # On ne peut pas capturer le frame ici facilement sans le passer,
-        # donc on utilise une approche simple
-        print(f"[Screenshot] Fonction screenshot disponible (TODO: implémenter capture)")
+        success = cv2.imwrite(filename, self._last_frame)
+        if success:
+            print(f"[Screenshot] ✅ Sauvegardé → {filename}")
+        else:
+            print(f"[Screenshot] ❌ Échec de la sauvegarde.")
 
 
 def main():

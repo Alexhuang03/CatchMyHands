@@ -21,7 +21,7 @@ class DrawPoint:
     """Un point du trait avec ses métadonnées."""
     x: int                  # Position X en pixels
     y: int                  # Position Y en pixels
-    thickness: int          # Épaisseur du trait
+    thickness: int = 0      # Épaisseur du trait (0 pour les break points)
     age: int = 0            # Âge en frames (pour le fade)
     is_break: bool = False  # True = interruption du trait (lever le stylo)
 

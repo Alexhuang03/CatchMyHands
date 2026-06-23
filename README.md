@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CatchMyHands 🖐️
 
 > Système de Vision par Ordinateur Interactive en temps réel — Détection des mains et des doigts avec effets visuels AR.
@@ -85,3 +86,6 @@ CatchMyHands/
 ## 🔧 Configuration
 
 Tous les paramètres sont dans `config.py` — seuils de détection, couleurs, résolution, etc.
+=======
+# CatchMyHands
+>>>>>>> 874f17ecc32eabec970594a5d617a20f6f001a76

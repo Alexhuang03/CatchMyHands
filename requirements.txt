@@ -1,0 +1,11 @@
+# CatchMyHands - Phase 1 PoC Dependencies
+# =========================================
+
+# MediaPipe - Hand landmark detection (Google AI Edge)
+mediapipe>=0.10.14
+
+# OpenCV - Camera capture & visual rendering
+opencv-python>=4.9.0
+
+# NumPy - Mathematical operations (landmarks, distances)
+numpy>=1.24.0

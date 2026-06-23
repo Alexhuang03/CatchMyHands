@@ -85,6 +85,10 @@ class CatchMyHands:
         # Recréer le drawing effect avec la résolution réelle
         self.drawing = DrawingEffect(actual_w, actual_h)
 
+        # ── Fenêtre redimensionnable ──
+        cv2.namedWindow("CatchMyHands", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("CatchMyHands", actual_w, actual_h)
+
         self.start_time = time.time()
         print("\n🎮 Contrôles :")
         print("   Q/ESC  Quitter | D  Squelette | I  IDs landmarks")

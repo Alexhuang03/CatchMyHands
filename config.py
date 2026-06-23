@@ -9,8 +9,8 @@ Modifier ces valeurs pour adapter le comportement sans toucher au code.
 # 📹 Caméra
 # ──────────────────────────────────────────
 CAMERA_INDEX = 0           # Index de la caméra (0 = webcam par défaut)
-CAMERA_WIDTH = 640         # Largeur de capture en pixels
-CAMERA_HEIGHT = 480        # Hauteur de capture en pixels
+CAMERA_WIDTH = 1280        # Largeur de capture en pixels
+CAMERA_HEIGHT = 720        # Hauteur de capture en pixels
 
 # ──────────────────────────────────────────
 # 🧠 MediaPipe HandLandmarker

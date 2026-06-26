@@ -6,7 +6,7 @@
 
 ## 🎮 Concept
 
-**CatchMyHands** utilise **MediaPipe Hands** (Google AI Edge) pour détecter les 21 points de repère de chaque main en temps réel. Lorsque les index et les pouces des deux mains se touchent, ils forment un **cadre interactif néon (néon cyan)**. 
+**CatchMyHands** utilise **MediaPipe Hands** (Google AI Edge) pour détecter les 21 points de repère de chaque main en temps réel. Lorsque les deux mains forment un geste en L (pouces et index étendus, autres doigts repliés), elles créent un **cadre néon dynamique** dont les 4 coins se situent directement sur le bout des index et des pouces.
 
 À l'intérieur de ce cadre, plusieurs filtres avancés peuvent être appliqués et combinés à l'aide de raccourcis clavier. Lorsque le cadre est rompu, un effet visuel de **bris de glace (Glass Shatter)** se déclenche à l'emplacement du cadre.
 
@@ -19,7 +19,7 @@
 | Geste / Touche | Action / Effet |
 | :--- | :--- |
 | **Main ouverte** | Affiche une aura d'énergie cyan pulsante au centre de la paume (atténuation progressive aux bords). |
-| **Double Pincement (Cadre)** | Forme un cadre de visée néon interactif et applique les filtres activés à l'intérieur. Les effets d'aura et de squelette sur les mains sont masqués pour dégager la vue. |
+| **Geste en L (Cadre)** | Forme un cadre néon reliant les index et les pouces des deux mains (4 coins définis directement par le bout des doigts). Les effets d'aura et de squelette sont masqués pendant l'activation. |
 | **Rupture du Cadre** | Déclenche instantanément une animation fluide de **bris de glace (Glass Shatter)** sur la zone où se trouvait le cadre. |
 | Touche **`1`** (ou `&`) | Active/Désactive l'**Option 1 : Scanner B&W** (convertit l'intérieur du cadre en noir et blanc). |
 | Touche **`2`** (ou `é`) | Active/Désactive l'**Option 2 : Pixelate** (effet mosaïque rétro pixelisé). |

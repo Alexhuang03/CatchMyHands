@@ -40,43 +40,37 @@ class BoxFrameEffect:
         """
         h, w = frame.shape[:2]
 
-        # Calculer le point de pincement pour chaque main (milieu entre pouce et index)
-        l_px = int((left_landmarks[4][0] + left_landmarks[8][0]) / 2.0 * w)
-        l_py = int((left_landmarks[4][1] + left_landmarks[8][1]) / 2.0 * h)
-        r_px = int((right_landmarks[4][0] + right_landmarks[8][0]) / 2.0 * w)
-        r_py = int((right_landmarks[4][1] + right_landmarks[8][1]) / 2.0 * h)
-
-        # Les 4 sommets du rectangle aligné sur les axes
+        # Les 4 sommets du polygone définis par les index et les pouces
         pts = np.array([
-            (l_px, l_py),
-            (r_px, l_py),
-            (r_px, r_py),
-            (l_px, r_py)
+            (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h)),   # Top-Left (Index Gauche)
+            (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h)), # Top-Right (Index Droit)
+            (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h)), # Bottom-Right (Pouce Droit)
+            (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))    # Bottom-Left (Pouce Gauche)
         ], dtype=np.int32)
 
-        # Sauvegarder la bounding box pour l'effet de bris de glace
-        self.last_box = (min(l_px, r_px), min(l_py, r_py), max(l_px, r_px), max(l_py, r_py))
+        # Calculer la bounding box pour l'effet de bris de glace et les opérations de filtrage
+        x1 = max(0, int(np.min(pts[:, 0])))
+        x2 = min(w, int(np.max(pts[:, 0])))
+        y1 = max(0, int(np.min(pts[:, 1])))
+        y2 = min(h, int(np.max(pts[:, 1])))
 
-        # ── Option 1 : Filtre Noir et Blanc à l'intérieur du cadre ──
-        if bw_filter:
-            x1 = max(0, min(l_px, r_px))
-            x2 = min(w, max(l_px, r_px))
-            y1 = max(0, min(l_py, r_py))
-            y2 = min(h, max(l_py, r_py))
-            if x2 > x1 and y2 > y1:
-                roi = frame[y1:y2, x1:x2]
+        self.last_box = (x1, y1, x2, y2)
+
+        # Appliquer les filtres dans le polygone
+        if (bw_filter or pix_filter) and (x2 > x1 and y2 > y1):
+            mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            cv2.fillPoly(mask, [pts], 255)
+            roi_mask = mask[y1:y2, x1:x2]
+            roi = frame[y1:y2, x1:x2]
+
+            if bw_filter:
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                frame[y1:y2, x1:x2] = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                filtered_roi = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                frame[y1:y2, x1:x2] = np.where(roi_mask[:, :, None] == 255, filtered_roi, roi)
 
-        # ── Option 2 : Filtre Pixelate à l'intérieur du cadre ──
-        if pix_filter:
-            x1 = max(0, min(l_px, r_px))
-            x2 = min(w, max(l_px, r_px))
-            y1 = max(0, min(l_py, r_py))
-            y2 = min(h, max(l_py, r_py))
-            if x2 > x1 and y2 > y1:
-                roi = frame[y1:y2, x1:x2]
-                frame[y1:y2, x1:x2] = self.minecraft_pixelate.render(roi)
+            elif pix_filter:
+                filtered_roi = self.minecraft_pixelate.render(roi)
+                frame[y1:y2, x1:x2] = np.where(roi_mask[:, :, None] == 255, filtered_roi, roi)
 
         # ── 1. Remplissage semi-transparent (Polygone) ──
         # On n'applique pas de teinte de couleur cyan si un filtre est actif (B&W ou Pixelate)
@@ -98,7 +92,12 @@ class BoxFrameEffect:
         cv2.polylines(frame, [pts], isClosed=True, color=neon_white, thickness=2, lineType=cv2.LINE_AA)
 
         # ── 3. Dessiner des réticules/coins de visée aux 4 sommets ──
-        for pt in [(l_px, l_py), (r_px, l_py), (r_px, r_py), (l_px, r_py)]:
+        for pt in [
+            (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h)),
+            (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h)),
+            (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h)),
+            (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))
+        ]:
             self._draw_reticle(frame, pt)
 
 

@@ -118,16 +118,16 @@ class GestureEngine:
     def check_two_hand_frame(self, left_landmarks: np.ndarray, right_landmarks: np.ndarray) -> bool:
         """
         Détecte si le geste de cadre à deux mains est actif.
-        Le cadre est activé si les deux mains effectuent un pincement (pouce + index serrés)
-        en même temps. Implémente une hystérésis robuste pour éviter le flickering.
+        Le cadre est activé si les deux mains font un geste en L (index et pouce étendus,
+        autres doigts repliés) en même temps. Implémente une hystérésis robuste.
         """
         if left_landmarks is None or right_landmarks is None:
             self._frame_stable_count = 0
             return False
 
-        # Distance pouce-index pour chaque main
-        left_pinch = self._euclidean_2d(left_landmarks[4], left_landmarks[8])
-        right_pinch = self._euclidean_2d(right_landmarks[4], right_landmarks[8])
+        # Vérifier si chaque main fait un geste de L
+        left_is_l = self._is_l_shape(left_landmarks)
+        right_is_l = self._is_l_shape(right_landmarks)
 
         # Initialiser les attributs d'hystérésis si nécessaire
         if not hasattr(self, '_two_hand_frame_active'):
@@ -135,26 +135,29 @@ class GestureEngine:
             self._frame_stable_count = 0
 
         if self._two_hand_frame_active:
-            # Seuil de relâchement plus large : il faut que les doigts s'écartent nettement
-            release_threshold = config.PINCH_RELEASE_THRESHOLD + 0.03
-            both_still_pinching = left_pinch < release_threshold and right_pinch < release_threshold
-
-            if both_still_pinching:
+            # Exiger que le geste disparaisse sur au moins une main pendant plusieurs frames pour désactiver
+            if left_is_l and right_is_l:
                 self._frame_stable_count = 0
             else:
                 self._frame_stable_count += 1
-                # Exiger N frames consécutives hors pincement pour désactiver
                 if self._frame_stable_count >= 8:
                     self._two_hand_frame_active = False
                     self._frame_stable_count = 0
         else:
-            # Seuil d'activation strict
-            activate_threshold = config.PINCH_THRESHOLD
-            if left_pinch < activate_threshold and right_pinch < activate_threshold:
+            # Activation quand les deux mains font le L-shape
+            if left_is_l and right_is_l:
                 self._two_hand_frame_active = True
                 self._frame_stable_count = 0
 
         return self._two_hand_frame_active
+
+    def _is_l_shape(self, landmarks: np.ndarray) -> bool:
+        """Vérifie si la main fait un geste de L (index + pouce étendus, majeur/annulaire repliés)."""
+        if landmarks is None or len(landmarks) < 21:
+            return False
+        fingers_extended = self._check_fingers_extended(landmarks)
+        # Pouce (0) et Index (1) étendus, Majeur (2) et Annulaire (3) repliés pour robustesse
+        return fingers_extended[0] and fingers_extended[1] and not fingers_extended[2] and not fingers_extended[3]
 
     def _euclidean_2d(self, p1: np.ndarray, p2: np.ndarray) -> float:
         """Distance euclidienne 2D entre deux landmarks (x, y)."""

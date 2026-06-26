@@ -59,7 +59,7 @@ AURA_BASE_OPACITY = 0.7               # Opacité de base de l'aura
 # ──────────────────────────────────────────
 # 🦴 Squelette (Debug)
 # ──────────────────────────────────────────
-SKELETON_ENABLED_DEFAULT = True        # Afficher le squelette par défaut
+SKELETON_ENABLED_DEFAULT = False        # Afficher le squelette par défaut
 SKELETON_POINT_RADIUS = 5             # Rayon des points landmarks
 SKELETON_LINE_THICKNESS = 2           # Épaisseur des lignes de connexion
 SKELETON_COLORS = {

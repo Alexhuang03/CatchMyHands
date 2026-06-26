@@ -77,7 +77,6 @@ class CatchMyHands:
         self.is_two_hand_frame_active = False
         self._was_frame_active = False  # Pour détecter la transition active → inactive
         self.option_bw_active = False
-        self.option_minecraft_active = False
         self.option_pixelate_active = False
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
@@ -140,7 +139,7 @@ class CatchMyHands:
                     frame = self._process_two_hands(frame)
                 else:
                     # Détecter la disparition du cadre pour déclencher le bris de glace
-                    if self._was_frame_active and (self.option_bw_active or self.option_minecraft_active or self.option_pixelate_active):
+                    if self._was_frame_active and (self.option_bw_active or self.option_pixelate_active):
                         if self.box_frame.last_box is not None:
                             x1, y1, x2, y2 = self.box_frame.last_box
                             self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=self.option_bw_active)
@@ -161,7 +160,6 @@ class CatchMyHands:
                 frame = self.menu_hud.render(
                     frame,
                     self.option_bw_active,
-                    self.option_minecraft_active,
                     self.option_pixelate_active
                 )
 
@@ -187,6 +185,7 @@ class CatchMyHands:
             cap.release()
             cv2.destroyAllWindows()
             self.detector.close()
+            self.box_frame.close()
 
             elapsed = time.time() - self.start_time
             avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
@@ -222,21 +221,24 @@ class CatchMyHands:
         handedness = self.detector.get_handedness(hand_idx)
 
         # ── Appliquer les effets ──
+        # Ne pas dessiner les effets individuels (aura et squelette) si le cadre à deux mains est actif ou en cours de transition
+        is_frame_rendering = self.is_two_hand_frame_active or self._was_frame_active
 
-        # Effet overlay aura (main ouverte)
-        if gesture.gesture_type == GestureType.OPEN_HAND and gesture.palm_center:
-            frame = self.overlay.render(
-                frame,
-                gesture.palm_center,
-                gesture.hand_size,
-                edge_factor
-            )
+        if not is_frame_rendering:
+            # Effet overlay aura (main ouverte)
+            if gesture.gesture_type == GestureType.OPEN_HAND and gesture.palm_center:
+                frame = self.overlay.render(
+                    frame,
+                    gesture.palm_center,
+                    gesture.hand_size,
+                    edge_factor
+                )
 
-        # Squelette (debug)
-        if self.show_skeleton:
-            frame = self.skeleton.render(
-                frame, smoothed, handedness, edge_factor
-            )
+            # Squelette (debug)
+            if self.show_skeleton:
+                frame = self.skeleton.render(
+                    frame, smoothed, handedness, edge_factor
+                )
 
         return frame
 
@@ -261,8 +263,8 @@ class CatchMyHands:
         self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
         if self.is_two_hand_frame_active:
-            frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active, mc_filter=self.option_minecraft_active, pix_filter=self.option_pixelate_active)
-        elif was_active_before and (self.option_bw_active or self.option_minecraft_active or self.option_pixelate_active):
+            frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active, pix_filter=self.option_pixelate_active)
+        elif was_active_before and (self.option_bw_active or self.option_pixelate_active):
             # Le cadre vient de disparaître → déclencher le bris de glace
             if self.box_frame.last_box is not None:
                 x1, y1, x2, y2 = self.box_frame.last_box
@@ -341,12 +343,8 @@ class CatchMyHands:
             print(f"[Option 1] Scanner B&W {'activé' if self.option_bw_active else 'désactivé'}")
 
         elif key == ord('2') or key == ord('é'):
-            self.option_minecraft_active = not self.option_minecraft_active
-            print(f"[Option 2] Minecraft {'activé' if self.option_minecraft_active else 'désactivé'}")
-
-        elif key == ord('3') or key == ord('"'):
             self.option_pixelate_active = not self.option_pixelate_active
-            print(f"[Option 3] Pixelate {'activé' if self.option_pixelate_active else 'désactivé'}")
+            print(f"[Option 2] Pixelate {'activé' if self.option_pixelate_active else 'désactivé'}")
 
 
 

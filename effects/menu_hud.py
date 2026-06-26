@@ -18,15 +18,14 @@ class MenuHUDEffect:
     def __init__(self):
         pass
 
-    def render(self, frame: np.ndarray, option_bw_active: bool, option_minecraft_active: bool = False, option_pixelate_active: bool = False) -> np.ndarray:
+    def render(self, frame: np.ndarray, option_bw_active: bool, option_pixelate_active: bool = False) -> np.ndarray:
         """
         Dessine le panneau du menu et ses options sur l'image.
 
         Args:
             frame: Image BGR d'OpenCV.
             option_bw_active: Statut de l'Option 1 (Noir et Blanc).
-            option_minecraft_active: Statut de l'Option 2 (Minecraft).
-            option_pixelate_active: Statut de l'Option 3 (Pixelisation globale).
+            option_pixelate_active: Statut de l'Option 2 (Pixelisation globale).
 
         Returns:
             L'image avec le menu HUD appliqué.
@@ -88,31 +87,20 @@ class MenuHUDEffect:
         status1_color = config.MENU_COLOR_ACTIVE if option_bw_active else config.MENU_COLOR_INACTIVE
         cv2.putText(frame, status1_text, (x2 - 45, y_offset), font, 0.45, status1_color, 2, cv2.LINE_AA)
 
-        # --- OPTION 2 : MINECRAFT ---
+        # --- OPTION 2 : PIXELATE ---
         y_offset += line_spacing
         opt2_key = "[2]"
-        opt2_name = "Minecraft"
+        opt2_name = "Pixelate"
         cv2.putText(frame, opt2_key, (x1 + 15, y_offset), font, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.putText(frame, opt2_name, (x1 + 45, y_offset), font, 0.45, (200, 200, 200), 1, cv2.LINE_AA)
 
-        status2_text = "ON" if option_minecraft_active else "OFF"
-        status2_color = config.MENU_COLOR_ACTIVE if option_minecraft_active else config.MENU_COLOR_INACTIVE
+        status2_text = "ON" if option_pixelate_active else "OFF"
+        status2_color = config.MENU_COLOR_ACTIVE if option_pixelate_active else config.MENU_COLOR_INACTIVE
         cv2.putText(frame, status2_text, (x2 - 45, y_offset), font, 0.45, status2_color, 2, cv2.LINE_AA)
-
-        # --- OPTION 3 : PIXELATE ---
-        y_offset += line_spacing
-        opt3_key = "[3]"
-        opt3_name = "Pixelate"
-        cv2.putText(frame, opt3_key, (x1 + 15, y_offset), font, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(frame, opt3_name, (x1 + 45, y_offset), font, 0.45, (200, 200, 200), 1, cv2.LINE_AA)
-
-        status3_text = "ON" if option_pixelate_active else "OFF"
-        status3_color = config.MENU_COLOR_ACTIVE if option_pixelate_active else config.MENU_COLOR_INACTIVE
-        cv2.putText(frame, status3_text, (x2 - 45, y_offset), font, 0.45, status3_color, 2, cv2.LINE_AA)
 
         # --- SECTION INFO BAS ---
         cv2.line(frame, (x1 + 15, y2 - 55), (x2 - 15, y2 - 55), (60, 60, 60), 1, cv2.LINE_AA)
-        cv2.putText(frame, "TOGGLES : 1, 2, 3", (x1 + 15, y2 - 40), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
+        cv2.putText(frame, "TOGGLES : 1, 2", (x1 + 15, y2 - 40), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
         cv2.putText(frame, "PINCH BOTH HANDS", (x1 + 15, y2 - 25), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
         cv2.putText(frame, "TO ACTIVATE FRAME", (x1 + 15, y2 - 10), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
 

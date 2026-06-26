@@ -77,6 +77,8 @@ class CatchMyHands:
         self.is_two_hand_frame_active = False
         self._was_frame_active = False  # Pour détecter la transition active → inactive
         self.option_bw_active = False
+        self.option_minecraft_active = False
+        self.option_pixelate_active = False
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
         self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
@@ -87,6 +89,7 @@ class CatchMyHands:
         cap = cv2.VideoCapture(config.CAMERA_INDEX)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+        cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
 
         if not cap.isOpened():
             print("❌ Impossible d'ouvrir la caméra !")
@@ -96,7 +99,8 @@ class CatchMyHands:
 
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"[Camera] Ouverte — {actual_w}x{actual_h}")
+        actual_fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"[Camera] Ouverte — {actual_w}x{actual_h} @ {actual_fps:.0f} FPS")
 
 
 
@@ -136,10 +140,10 @@ class CatchMyHands:
                     frame = self._process_two_hands(frame)
                 else:
                     # Détecter la disparition du cadre pour déclencher le bris de glace
-                    if self._was_frame_active and self.option_bw_active:
+                    if self._was_frame_active and (self.option_bw_active or self.option_minecraft_active or self.option_pixelate_active):
                         if self.box_frame.last_box is not None:
                             x1, y1, x2, y2 = self.box_frame.last_box
-                            self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=True)
+                            self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=self.option_bw_active)
                             self.box_frame.last_box = None
                     self.is_two_hand_frame_active = False
 
@@ -154,7 +158,12 @@ class CatchMyHands:
                 frame = self._render_hud(frame, num_hands)
 
                 # ── Menu Latéral (Options) ──
-                frame = self.menu_hud.render(frame, self.option_bw_active)
+                frame = self.menu_hud.render(
+                    frame,
+                    self.option_bw_active,
+                    self.option_minecraft_active,
+                    self.option_pixelate_active
+                )
 
                 # ── Affichage ──
                 cv2.imshow("CatchMyHands", frame)
@@ -252,12 +261,12 @@ class CatchMyHands:
         self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
         if self.is_two_hand_frame_active:
-            frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active)
-        elif was_active_before and self.option_bw_active:
+            frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active, mc_filter=self.option_minecraft_active, pix_filter=self.option_pixelate_active)
+        elif was_active_before and (self.option_bw_active or self.option_minecraft_active or self.option_pixelate_active):
             # Le cadre vient de disparaître → déclencher le bris de glace
             if self.box_frame.last_box is not None:
                 x1, y1, x2, y2 = self.box_frame.last_box
-                self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=True)
+                self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=self.option_bw_active)
                 self.box_frame.last_box = None
 
         return frame
@@ -332,10 +341,12 @@ class CatchMyHands:
             print(f"[Option 1] Scanner B&W {'activé' if self.option_bw_active else 'désactivé'}")
 
         elif key == ord('2') or key == ord('é'):
-            print("[Option 2] Verrouillée.")
+            self.option_minecraft_active = not self.option_minecraft_active
+            print(f"[Option 2] Minecraft {'activé' if self.option_minecraft_active else 'désactivé'}")
 
         elif key == ord('3') or key == ord('"'):
-            print("[Option 3] Verrouillée.")
+            self.option_pixelate_active = not self.option_pixelate_active
+            print(f"[Option 3] Pixelate {'activé' if self.option_pixelate_active else 'désactivé'}")
 
 
 

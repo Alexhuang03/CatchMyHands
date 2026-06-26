@@ -11,6 +11,7 @@ Modifier ces valeurs pour adapter le comportement sans toucher au code.
 CAMERA_INDEX = 0           # Index de la caméra (0 = webcam par défaut)
 CAMERA_WIDTH = 1280        # Largeur de capture en pixels
 CAMERA_HEIGHT = 720        # Hauteur de capture en pixels
+CAMERA_FPS = 60            # FPS demandés à la caméra (si supporté)
 
 # ──────────────────────────────────────────
 # 🧠 MediaPipe HandLandmarker
@@ -96,4 +97,9 @@ MENU_TITLE_COLOR = (255, 255, 255)     # Couleur du titre (blanc)
 MENU_COLOR_ACTIVE = (0, 255, 128)     # Vert néon pour les options actives
 MENU_COLOR_INACTIVE = (128, 128, 128) # Gris pour les options inactives
 
-
+# ──────────────────────────────────────────
+# 🟫 Effet Minecraft (Pixelisation)
+# ──────────────────────────────────────────
+MINECRAFT_BLOCK_SIZE = 8              # Taille des blocs en pixels (plus grand = plus pixelisé)
+MINECRAFT_GRID_LINES = True           # Afficher la grille entre les blocs
+MINECRAFT_COLOR_REDUCE = True         # Réduire la palette de couleurs (look rétro)

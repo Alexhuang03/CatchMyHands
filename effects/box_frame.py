@@ -8,6 +8,8 @@ Affiche un polygone translucide avec des bordures néon et des réticules de vis
 import cv2
 import numpy as np
 import config
+from effects.minecraft_block import MinecraftBlockEffect
+from effects.minecraft_effect import MinecraftEffect
 
 class BoxFrameEffect:
     """
@@ -17,8 +19,10 @@ class BoxFrameEffect:
 
     def __init__(self):
         self.last_box = None  # (x1, y1, x2, y2) de la dernière frame
+        self.minecraft_block = MinecraftBlockEffect()
+        self.minecraft_pixelate = MinecraftEffect()
 
-    def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray, bw_filter: bool = False) -> np.ndarray:
+    def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray, bw_filter: bool = False, mc_filter: bool = False, pix_filter: bool = False) -> np.ndarray:
         """
         Dessine le cadre néon et les effets visuels associés sur l'image.
 
@@ -27,6 +31,8 @@ class BoxFrameEffect:
             left_landmarks: Landmarks de la main gauche (21, 3).
             right_landmarks: Landmarks de la main droite (21, 3).
             bw_filter: Si True, convertit l'intérieur du cadre en noir et blanc.
+            mc_filter: Si True, convertit l'intérieur du cadre en mosaïque Minecraft.
+            pix_filter: Si True, convertit l'intérieur du cadre en pixelisation simple.
 
         Returns:
             L'image avec l'effet appliqué.
@@ -61,9 +67,28 @@ class BoxFrameEffect:
                 gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                 frame[y1:y2, x1:x2] = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
+        # ── Option 2 : Filtre Mosaïque Minecraft à l'intérieur du cadre ──
+        if mc_filter:
+            x1 = max(0, min(l_px, r_px))
+            x2 = min(w, max(l_px, r_px))
+            y1 = max(0, min(l_py, r_py))
+            y2 = min(h, max(l_py, r_py))
+            if x2 > x1 and y2 > y1:
+                frame = self.minecraft_block.render(frame, x1, y1, x2, y2)
+
+        # ── Option 3 : Filtre Pixelate à l'intérieur du cadre ──
+        if pix_filter:
+            x1 = max(0, min(l_px, r_px))
+            x2 = min(w, max(l_px, r_px))
+            y1 = max(0, min(l_py, r_py))
+            y2 = min(h, max(l_py, r_py))
+            if x2 > x1 and y2 > y1:
+                roi = frame[y1:y2, x1:x2]
+                frame[y1:y2, x1:x2] = self.minecraft_pixelate.render(roi)
+
         # ── 1. Remplissage semi-transparent (Polygone) ──
-        # On n'applique pas de teinte de couleur cyan si le filtre Noir et Blanc est actif
-        if not bw_filter:
+        # On n'applique pas de teinte de couleur cyan si un filtre est actif (B&W, Minecraft ou Pixelate)
+        if not bw_filter and not mc_filter and not pix_filter:
             overlay = frame.copy()
             cv2.fillPoly(overlay, [pts], config.FRAME_COLOR)
             cv2.addWeighted(overlay, config.FRAME_FILL_OPACITY, frame, 1.0 - config.FRAME_FILL_OPACITY, 0, frame)

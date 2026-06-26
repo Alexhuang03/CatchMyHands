@@ -1,127 +1,96 @@
 """
-CatchMyHands - Minecraft Block Effect
-======================================
-Génère des textures 16x16 de blocs Minecraft (herbe, terre, pierre, eau, sable, brique, etc.)
-et convertit la zone à l'intérieur du cadre en une mosaïque de blocs Minecraft 3D.
+CatchMyHands - Minecraft Face Mask Effect
+==========================================
+Détecte le visage à l'intérieur du cadre et dessine la tête de Steve (Minecraft)
+par-dessus avec lissage temporel (EMA) pour éviter le sautillement.
 """
 
 import cv2
 import numpy as np
 
 
-class MinecraftBlockEffect:
+class MinecraftFaceEffect:
     """
-    Effet mosaïque Minecraft à l'intérieur du cadre de jeu.
-    Calcule la couleur moyenne de chaque cellule du cadre, trouve la texture Minecraft
-    la plus proche en termes de couleur BGR, et dessine le bloc correspondant.
+    Détecte le visage de l'utilisateur à l'intérieur du cadre
+    et applique un masque de tête de Steve Minecraft en temps réel.
     """
 
-    def __init__(self, block_size: int = 16):
-        self.block_size = block_size
-        self._init_textures()
+    def __init__(self):
+        # Charger le classificateur de visage OpenCV Haar Cascade
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        
+        # Générer la texture de la tête de Steve (8x8 pixels)
+        self.steve_face = self._generate_steve_face()
+        
+        # Variables de lissage (EMA) pour la boîte du visage
+        self._smoothed_face = None  # [x, y, w, h]
+        self._lost_frames = 0
+        self._MAX_LOST_FRAMES = 8    # Nombre de frames de tolérance en cas de perte de détection
+        self._smooth_alpha = 0.35    # Facteur EMA (plus bas = plus fluide, plus haut = réactif)
 
-    def _init_textures(self):
-        """Génère procéduralement des textures 16x16 style Minecraft."""
-        size = self.block_size
-
-        # ── 1. Terre (Dirt) ──
-        dirt = np.zeros((size, size, 3), dtype=np.uint8)
-        dirt[:, :] = [45, 80, 110]  # Marron moyen BGR
-        np.random.seed(42)
-        mask_dark = np.random.rand(size, size) < 0.25
-        mask_light = np.random.rand(size, size) < 0.15
-        dirt[mask_dark] = [30, 55, 80]
-        dirt[mask_light] = [60, 100, 130]
-
-        # ── 2. Herbe (Grass) ──
-        grass = dirt.copy()
-        grass[0:size // 4, :] = [35, 115, 35]  # Dessus vert
-        for x in range(size):
-            if x % 2 == 0:
-                grass[size // 4, x] = [35, 115, 35]
-            if x % 5 == 0:
-                grass[size // 4 + 1, x] = [35, 115, 35]
-
-        # ── 3. Pierre (Stone) ──
-        stone = np.zeros((size, size, 3), dtype=np.uint8)
-        stone[:, :] = [120, 120, 120]  # Gris
-        np.random.seed(100)
-        mask_dark = np.random.rand(size, size) < 0.25
-        mask_light = np.random.rand(size, size) < 0.2
-        stone[mask_dark] = [80, 80, 80]
-        stone[mask_light] = [160, 160, 160]
-
-        # ── 4. Planches de bois (Oak Planks) ──
-        planks = np.zeros((size, size, 3), dtype=np.uint8)
-        planks[:, :] = [70, 130, 180]  # Beige/bois clair
-        # Lignes de planche
-        for y in range(0, size, size // 4):
-            planks[y, :] = [40, 90, 130]
-        # Joints verticaux
-        planks[0:size // 4, size // 4] = [40, 90, 130]
-        planks[size // 4:size // 2, size * 3 // 4] = [40, 90, 130]
-        planks[size // 2:size * 3 // 4, size // 8] = [40, 90, 130]
-        planks[size * 3 // 4:, size * 5 // 8] = [40, 90, 130]
-
-        # ── 5. Eau (Water) ──
-        water = np.zeros((size, size, 3), dtype=np.uint8)
-        water[:, :] = [180, 80, 20]  # Bleu BGR
-        for y in range(size):
-            for x in range(size):
-                if (x + y) % (size // 2) == 0 or (x - y) % (size // 2) == 0:
-                    water[y, x] = [210, 130, 60]
-
-        # ── 6. Sable (Sand) ──
-        sand = np.zeros((size, size, 3), dtype=np.uint8)
-        sand[:, :] = [160, 220, 240]  # Jaune sable BGR
-        np.random.seed(200)
-        mask_dark = np.random.rand(size, size) < 0.15
-        sand[mask_dark] = [140, 195, 210]
-
-        # ── 7. Brique (Brick) ──
-        brick = np.zeros((size, size, 3), dtype=np.uint8)
-        brick[:, :] = [40, 50, 170]  # Rouge brique BGR
-        for y in range(0, size, size // 3):
-            brick[y, :] = [180, 180, 180]
-        brick[0:size // 3, size // 2] = [180, 180, 180]
-        brick[size // 3:size * 2 // 3, size // 4] = [180, 180, 180]
-        brick[size // 3:size * 2 // 3, size * 3 // 4] = [180, 180, 180]
-        brick[size * 2 // 3:, size // 2] = [180, 180, 180]
-
-        # ── 8. Obsidienne (Obsidian) ──
-        obsidian = np.zeros((size, size, 3), dtype=np.uint8)
-        obsidian[:, :] = [40, 15, 40]  # Violet très foncé BGR
-        np.random.seed(300)
-        mask_purple = np.random.rand(size, size) < 0.15
-        obsidian[mask_purple] = [100, 40, 100]
-
-        # ── 9. Feuilles (Leaves) ──
-        leaves = np.zeros((size, size, 3), dtype=np.uint8)
-        leaves[:, :] = [10, 80, 15]  # Vert foncé BGR
-        np.random.seed(500)
-        mask_light = np.random.rand(size, size) < 0.3
-        leaves[mask_light] = [20, 120, 25]
-
-        # Stocker les blocs et leurs couleurs de référence
-        self.blocks = [
-            {"image": grass, "color": np.array([40, 120, 40], dtype=np.float32)},
-            {"image": leaves, "color": np.array([15, 80, 10], dtype=np.float32)},
-            {"image": dirt, "color": np.array([45, 80, 110], dtype=np.float32)},
-            {"image": stone, "color": np.array([120, 120, 120], dtype=np.float32)},
-            {"image": planks, "color": np.array([70, 130, 180], dtype=np.float32)},
-            {"image": water, "color": np.array([180, 80, 20], dtype=np.float32)},
-            {"image": sand, "color": np.array([160, 220, 240], dtype=np.float32)},
-            {"image": brick, "color": np.array([40, 50, 170], dtype=np.float32)},
-            {"image": obsidian, "color": np.array([40, 15, 40], dtype=np.float32)},
-        ]
+    def _generate_steve_face(self) -> np.ndarray:
+        """Génère la texture couleur officielle de la tête de Steve Minecraft."""
+        face = np.zeros((8, 8, 3), dtype=np.uint8)
+        
+        # Palette de couleurs Minecraft Steve (format BGR)
+        HAIR = [12, 34, 62]     # #3e220c - Marron foncé
+        SKIN = [125, 172, 226]  # #e2ac7d - Peau pêche
+        WHITE = [255, 255, 255] # Blanc des yeux
+        BLUE = [215, 115, 60]   # #3c73d7 - Yeux bleus Steve
+        NOSE = [90, 115, 170]   # #aa735a - Peau plus foncée (nez)
+        BEARD = [18, 38, 68]    # #442612 - Barbe/Moustache
+        MOUTH = [35, 45, 115]   # #732d23 - Lèvres rouges
+        
+        # Lignes 0 & 1 : Cheveux
+        face[0, :] = HAIR
+        face[1, :] = HAIR
+        
+        # Ligne 2 : Cheveux sur les côtés, peau au milieu
+        face[2, 0] = HAIR
+        face[2, 1:7] = SKIN
+        face[2, 7] = HAIR
+        
+        # Ligne 3 : Peau complète
+        face[3, :] = SKIN
+        
+        # Ligne 4 : Yeux (Blanc/Bleu) et peau
+        face[4, 0] = SKIN
+        face[4, 1] = WHITE
+        face[4, 2] = BLUE
+        face[4, 3:5] = SKIN
+        face[4, 5] = BLUE
+        face[4, 6] = WHITE
+        face[4, 7] = SKIN
+        
+        # Ligne 5 : Nez
+        face[5, 0:3] = SKIN
+        face[5, 3:5] = NOSE
+        face[5, 5:8] = SKIN
+        
+        # Ligne 6 : Bouche, moustache et peau
+        face[6, 0] = SKIN
+        face[6, 1] = BEARD
+        face[6, 2] = SKIN
+        face[6, 3:5] = MOUTH
+        face[6, 5] = SKIN
+        face[6, 6] = BEARD
+        face[6, 7] = SKIN
+        
+        # Ligne 7 : Menton/barbe
+        face[7, 0] = SKIN
+        face[7, 1:7] = BEARD
+        face[7, 7] = SKIN
+        
+        return face
 
     def render(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> np.ndarray:
         """
-        Remplace la région (x1, y1) -> (x2, y2) par une mosaïque de blocs Minecraft.
+        Détecte le visage dans la zone du cadre et dessine la tête de Steve par-dessus.
         """
         h, w = frame.shape[:2]
 
-        # Clamper les coordonnées
+        # Clamper les coordonnées de la zone de rendu
         x1 = max(0, x1)
         x2 = min(w, x2)
         y1 = max(0, y1)
@@ -129,43 +98,86 @@ class MinecraftBlockEffect:
 
         roi_w = x2 - x1
         roi_h = y2 - y1
-        if roi_w <= self.block_size or roi_h <= self.block_size:
+        # Si le cadre est trop petit, inutile de chercher un visage
+        if roi_w < 60 or roi_h < 60:
             return frame
 
-        # Calculer le nombre de blocs
-        cols = roi_w // self.block_size
-        rows = roi_h // self.block_size
+        # Extraire la zone d'intérêt
+        roi = frame[y1:y2, x1:x2]
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
 
-        grid_w = cols * self.block_size
-        grid_h = rows * self.block_size
+        # Détecter le visage dans la zone du cadre
+        # On définit une taille minimale dynamique pour éviter les faux positifs de bruit de fond
+        min_size = int(min(roi_w, roi_h) * 0.2)
+        faces = self.face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(min_size, min_size)
+        )
 
-        # Centrer la grille de blocs dans le rectangle
-        start_x = x1 + (roi_w - grid_w) // 2
-        start_y = y1 + (roi_h - grid_h) // 2
+        target_face = None
 
-        roi = frame[start_y:start_y + grid_h, start_x:start_x + grid_w]
+        if len(faces) > 0:
+            # Garder le visage le plus grand (le plus proche)
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            target_face = faces[0]
+            self._lost_frames = 0
+        else:
+            # En cas de perte de détection sur quelques frames, on garde la position précédente
+            self._lost_frames += 1
+            if self._lost_frames < self._MAX_LOST_FRAMES:
+                target_face = self._smoothed_face
 
-        # Downscale de l'image pour obtenir l'exacte couleur moyenne de chaque bloc
-        small_roi = cv2.resize(roi, (cols, rows), interpolation=cv2.INTER_AREA)
+        if target_face is not None:
+            # Lissage EMA des coordonnées [x, y, w, h] pour éviter le flickering
+            if self._smoothed_face is None:
+                self._smoothed_face = np.array(target_face, dtype=np.float32)
+            else:
+                self._smoothed_face = (
+                    self._smoothed_face * (1.0 - self._smooth_alpha) +
+                    np.array(target_face, dtype=np.float32) * self._smooth_alpha
+                )
 
-        # Remplacer chaque cellule de l'image par la texture Minecraft correspondante
-        for r in range(rows):
-            y_pos = start_y + r * self.block_size
-            for c in range(cols):
-                x_pos = start_x + c * self.block_size
-                avg_color = small_roi[r, c].astype(np.float32)
+            # Coordonnées entières lissées
+            fx, fy, fw, fh = self._smoothed_face.astype(int)
 
-                # Trouver la texture la plus proche
-                best_dist = float('inf')
-                best_texture = None
-                for block in self.blocks:
-                    # Distance euclidienne pondérée pour une meilleure correspondance visuelle
-                    dist = np.sum((avg_color - block["color"]) ** 2)
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_texture = block["image"]
+            # Élargir la boîte pour couvrir les cheveux, les oreilles et le menton (aspect cubique)
+            pad_w = int(fw * 0.15)
+            pad_h = int(fh * 0.15)
 
-                if best_texture is not None:
-                    frame[y_pos:y_pos + self.block_size, x_pos:x_pos + self.block_size] = best_texture
+            # Coordonnées globales dans le frame
+            sx1 = x1 + fx - pad_w
+            sy1 = y1 + fy - pad_h
+            sx2 = x1 + fx + fw + pad_w
+            sy2 = y1 + fy + fh + pad_h
+
+            # Clamper pour l'affichage (permet à Steve de dépasser du cadre de manière naturelle)
+            sx1_c = max(0, sx1)
+            sy1_c = max(0, sy1)
+            sx2_c = min(w, sx2)
+            sy2_c = min(h, sy2)
+
+            overlap_w = sx2_c - sx1_c
+            overlap_h = sy2_c - sy1_c
+
+            if overlap_w > 0 and overlap_h > 0:
+                # Recréer la tête à la taille complète
+                target_w = sx2 - sx1
+                target_h = sy2 - sy1
+                steve_resized = cv2.resize(self.steve_face, (target_w, target_h), interpolation=cv2.INTER_NEAREST)
+
+                # Extraire la partie visible
+                crop_x1 = sx1_c - sx1
+                crop_y1 = sy1_c - sy1
+                crop_x2 = crop_x1 + overlap_w
+                crop_y2 = crop_y1 + overlap_h
+
+                steve_visible = steve_resized[crop_y1:crop_y2, crop_x1:crop_x2]
+
+                # Remplacer les pixels de l'image réelle par Steve
+                frame[sy1_c:sy2_c, sx1_c:sx2_c] = steve_visible
+        else:
+            self._smoothed_face = None
 
         return frame

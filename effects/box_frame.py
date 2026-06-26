@@ -8,7 +8,7 @@ Affiche un polygone translucide avec des bordures néon et des réticules de vis
 import cv2
 import numpy as np
 import config
-from effects.minecraft_block import MinecraftBlockEffect
+from effects.minecraft_block import MinecraftFaceEffect
 from effects.minecraft_effect import MinecraftEffect
 
 class BoxFrameEffect:
@@ -19,7 +19,7 @@ class BoxFrameEffect:
 
     def __init__(self):
         self.last_box = None  # (x1, y1, x2, y2) de la dernière frame
-        self.minecraft_block = MinecraftBlockEffect()
+        self.minecraft_face = MinecraftFaceEffect()
         self.minecraft_pixelate = MinecraftEffect()
 
     def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray, bw_filter: bool = False, mc_filter: bool = False, pix_filter: bool = False) -> np.ndarray:
@@ -74,7 +74,7 @@ class BoxFrameEffect:
             y1 = max(0, min(l_py, r_py))
             y2 = min(h, max(l_py, r_py))
             if x2 > x1 and y2 > y1:
-                frame = self.minecraft_block.render(frame, x1, y1, x2, y2)
+                frame = self.minecraft_face.render(frame, x1, y1, x2, y2)
 
         # ── Option 3 : Filtre Pixelate à l'intérieur du cadre ──
         if pix_filter:

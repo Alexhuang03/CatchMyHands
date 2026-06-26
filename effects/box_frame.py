@@ -81,26 +81,6 @@ class BoxFrameEffect:
         for pt in [(l_px, l_py), (r_px, l_py), (r_px, r_py), (l_px, r_py)]:
             self._draw_reticle(frame, pt)
 
-        # ── 4. Texte informatif central ──
-        # On calcule le centre géométrique du cadre
-        cx = int((l_px + r_px) / 2)
-        cy = int((l_py + r_py) / 2)
-        
-        # Dessiner le texte "ENERGY FRAME" au centre
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        text = "ENERGY FRAME"
-        text_size = cv2.getTextSize(text, font, 0.4, 1)[0]
-        text_x = cx - text_size[0] // 2
-        text_y = cy + text_size[1] // 2
-
-        # Ajouter un fond noir semi-transparent derrière le texte pour la lisibilité
-        padding = 4
-        cv2.rectangle(frame, 
-                      (text_x - padding, text_y - text_size[1] - padding),
-                      (text_x + text_size[0] + padding, text_y + padding),
-                      (0, 0, 0), -1)
-        
-        cv2.putText(frame, text, (text_x, text_y), font, 0.4, neon_white, 1, cv2.LINE_AA)
 
         return frame
 

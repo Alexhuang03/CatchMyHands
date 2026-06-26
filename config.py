@@ -47,15 +47,6 @@ MAX_JUMP_RATIO = 0.3                  # Saut max entre 2 frames (ratio taille ma
 EDGE_FADE_MARGIN = 0.1                # Marge pour atténuation progressive aux bords
 
 # ──────────────────────────────────────────
-# 🎨 Effets visuels — Dessin (Pincement)
-# ──────────────────────────────────────────
-DRAW_COLOR = (0, 255, 128)            # Couleur BGR du trait (vert néon)
-DRAW_THICKNESS_MIN = 2                # Épaisseur min du trait
-DRAW_THICKNESS_MAX = 8                # Épaisseur max (vitesse lente)
-DRAW_FADE_ENABLED = True              # Activer le fade progressif des traits
-DRAW_FADE_DURATION = 150              # Nombre de frames avant disparition complète
-
-# ──────────────────────────────────────────
 # 🎨 Effets visuels — Overlay Aura (Main ouverte)
 # ──────────────────────────────────────────
 AURA_IMAGE_PATH = "assets/aura.png"   # Image PNG avec canal alpha
@@ -94,4 +85,15 @@ FRAME_GESTURE_THRESHOLD = 0.08        # Distance normalisée max pour valider le
 FRAME_COLOR = (255, 230, 50)          # Couleur BGR du cadre (bleu cyan néon)
 FRAME_LINE_THICKNESS = 2              # Épaisseur des lignes de bordure
 FRAME_FILL_OPACITY = 0.2              # Opacité du remplissage (0.0 = transparent, 1.0 = opaque)
+
+# ──────────────────────────────────────────
+# 📊 Menu Latéral (HUD Côté Droit)
+# ──────────────────────────────────────────
+MENU_WIDTH = 220                      # Largeur du menu en pixels
+MENU_BG_OPACITY = 0.65                # Opacité du fond du menu
+MENU_BORDER_COLOR = (255, 230, 50)    # Couleur de la bordure du menu (cyan)
+MENU_TITLE_COLOR = (255, 255, 255)     # Couleur du titre (blanc)
+MENU_COLOR_ACTIVE = (0, 255, 128)     # Vert néon pour les options actives
+MENU_COLOR_INACTIVE = (128, 128, 128) # Gris pour les options inactives
+
 

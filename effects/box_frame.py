@@ -18,7 +18,7 @@ class BoxFrameEffect:
     def __init__(self):
         pass
 
-    def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray) -> np.ndarray:
+    def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray, bw_filter: bool = False) -> np.ndarray:
         """
         Dessine le cadre néon et les effets visuels associés sur l'image.
 
@@ -26,6 +26,7 @@ class BoxFrameEffect:
             frame: L'image BGR d'OpenCV.
             left_landmarks: Landmarks de la main gauche (21, 3).
             right_landmarks: Landmarks de la main droite (21, 3).
+            bw_filter: Si True, convertit l'intérieur du cadre en noir et blanc.
 
         Returns:
             L'image avec l'effet appliqué.
@@ -46,10 +47,23 @@ class BoxFrameEffect:
             (l_px, r_py)
         ], dtype=np.int32)
 
+        # ── Option 1 : Filtre Noir et Blanc à l'intérieur du cadre ──
+        if bw_filter:
+            x1 = max(0, min(l_px, r_px))
+            x2 = min(w, max(l_px, r_px))
+            y1 = max(0, min(l_py, r_py))
+            y2 = min(h, max(l_py, r_py))
+            if x2 > x1 and y2 > y1:
+                roi = frame[y1:y2, x1:x2]
+                gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                frame[y1:y2, x1:x2] = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
         # ── 1. Remplissage semi-transparent (Polygone) ──
-        overlay = frame.copy()
-        cv2.fillPoly(overlay, [pts], config.FRAME_COLOR)
-        cv2.addWeighted(overlay, config.FRAME_FILL_OPACITY, frame, 1.0 - config.FRAME_FILL_OPACITY, 0, frame)
+        # On n'applique pas de teinte de couleur cyan si le filtre Noir et Blanc est actif
+        if not bw_filter:
+            overlay = frame.copy()
+            cv2.fillPoly(overlay, [pts], config.FRAME_COLOR)
+            cv2.addWeighted(overlay, config.FRAME_FILL_OPACITY, frame, 1.0 - config.FRAME_FILL_OPACITY, 0, frame)
 
         # ── 2. Lignes de bordure néon (Effet de lueur) ──
         # Lueur externe (largeur 6, couleur d'origine avec lissage LINE_AA)

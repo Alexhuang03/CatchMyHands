@@ -33,10 +33,10 @@ from core.hand_detector import HandDetector
 from core.gesture_engine import GestureEngine, GestureType
 from core.smoothing import LandmarkSmoother
 from core.safety import SafetyGuard
-from effects.drawing import DrawingEffect
 from effects.overlay import OverlayEffect
 from effects.skeleton import SkeletonRenderer
 from effects.box_frame import BoxFrameEffect
+from effects.menu_hud import MenuHUDEffect
 from utils.fps_counter import FPSCounter
 
 
@@ -60,10 +60,10 @@ class CatchMyHands:
         self.safety = SafetyGuard()
 
         # ── Effets visuels ──
-        self.drawing = DrawingEffect(config.CAMERA_WIDTH, config.CAMERA_HEIGHT)
         self.overlay = OverlayEffect()
         self.skeleton = SkeletonRenderer()
         self.box_frame = BoxFrameEffect()
+        self.menu_hud = MenuHUDEffect()
 
         # ── État ──
         self.show_skeleton = config.SKELETON_ENABLED_DEFAULT
@@ -73,6 +73,7 @@ class CatchMyHands:
         self._last_frame = None  # Dernière frame pour le screenshot
         self._smoothed_hands_this_frame = []
         self.is_two_hand_frame_active = False
+        self.option_bw_active = False
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
         self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
@@ -94,8 +95,7 @@ class CatchMyHands:
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"[Camera] Ouverte — {actual_w}x{actual_h}")
 
-        # Recréer le drawing effect avec la résolution réelle
-        self.drawing = DrawingEffect(actual_w, actual_h)
+
 
         # ── Fenêtre redimensionnable ──
         cv2.namedWindow("CatchMyHands", cv2.WINDOW_NORMAL)
@@ -104,7 +104,7 @@ class CatchMyHands:
         self.start_time = time.time()
         print("\n🎮 Contrôles :")
         print("   Q/ESC  Quitter | D  Squelette | I  IDs landmarks")
-        print("   C  Clear canvas | S  Screenshot | +/-  Seuil pincement")
+        print("   S  Screenshot | +/-  Seuil pincement")
         print("-" * 50)
 
         try:
@@ -137,6 +137,9 @@ class CatchMyHands:
                 # ── HUD (Heads-Up Display) ──
                 frame = self._render_hud(frame, num_hands)
 
+                # ── Menu Latéral (Options) ──
+                frame = self.menu_hud.render(frame, self.option_bw_active)
+
                 # ── Affichage ──
                 cv2.imshow("CatchMyHands", frame)
                 self._last_frame = frame  # Sauvegarder pour screenshot
@@ -150,6 +153,10 @@ class CatchMyHands:
 
         except KeyboardInterrupt:
             print("\n⏹ Interrompu par l'utilisateur")
+        except BaseException as e:
+            import traceback
+            print(f"\n❌ Erreur inattendue : {type(e).__name__} - {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
         finally:
             # ── Nettoyage ──
             cap.release()
@@ -191,16 +198,6 @@ class CatchMyHands:
 
         # ── Appliquer les effets ──
 
-        # Effet dessin (pincement)
-        # Si le cadre à deux mains est actif, on désactive le dessin pour cette frame
-        is_pinching = (gesture.gesture_type == GestureType.PINCH) and not self.is_two_hand_frame_active
-        if gesture.pinch_position:
-            self.drawing.update(
-                hand_idx,
-                gesture.pinch_position,
-                is_pinching
-            )
-
         # Effet overlay aura (main ouverte)
         if gesture.gesture_type == GestureType.OPEN_HAND and gesture.palm_center:
             frame = self.overlay.render(
@@ -209,21 +206,6 @@ class CatchMyHands:
                 gesture.hand_size,
                 edge_factor
             )
-
-        # Effet clear canvas (poing fermé) — avec cooldown anti-boucle
-        if gesture.gesture_type == GestureType.FIST:
-            cooldown = self._fist_cooldown.get(hand_idx, 0)
-            if cooldown <= 0 and gesture.confidence > 0.8:
-                self.drawing.clear()
-                self._fist_cooldown[hand_idx] = self._FIST_COOLDOWN_FRAMES
-            elif cooldown > 0:
-                self._fist_cooldown[hand_idx] = cooldown - 1
-        else:
-            # Reset le cooldown quand le poing est relâché
-            self._fist_cooldown[hand_idx] = 0
-
-        # Rendu du dessin (toujours, pour les trails persistants)
-        frame = self.drawing.render(frame)
 
         # Squelette (debug)
         if self.show_skeleton:
@@ -253,7 +235,7 @@ class CatchMyHands:
         self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
         if self.is_two_hand_frame_active:
-            frame = self.box_frame.render(frame, lm_left, lm_right)
+            frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active)
 
         return frame
 
@@ -322,8 +304,17 @@ class CatchMyHands:
         elif key == ord('i'):
             self.skeleton.toggle_ids()
 
-        elif key == ord('c'):
-            self.drawing.clear()
+        elif key == ord('1') or key == ord('&'):
+            self.option_bw_active = not self.option_bw_active
+            print(f"[Option 1] Scanner B&W {'activé' if self.option_bw_active else 'désactivé'}")
+
+        elif key == ord('2') or key == ord('é'):
+            print("[Option 2] Verrouillée.")
+
+        elif key == ord('3') or key == ord('"'):
+            print("[Option 3] Verrouillée.")
+
+
 
         elif key == ord('s'):
             self._take_screenshot()

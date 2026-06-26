@@ -8,9 +8,9 @@ Contrôles clavier :
     Q / ESC   : Quitter
     D         : Toggle squelette
     I         : Toggle IDs des landmarks
-    C         : Effacer le canvas de dessin
     S         : Screenshot
     +/-       : Ajuster seuil de pincement
+    1 / 2     : Activer/Désactiver les filtres (1: Scanner B&W, 2: Pixelate)
 """
 
 import os
@@ -78,9 +78,6 @@ class CatchMyHands:
         self._was_frame_active = False  # Pour détecter la transition active → inactive
         self.option_bw_active = False
         self.option_pixelate_active = False
-        # Cooldown pour le geste FIST (évite l'effacement en boucle)
-        self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
-        self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
 
     def run(self):
         """Lance la boucle principale."""
@@ -103,9 +100,9 @@ class CatchMyHands:
 
 
 
-        # ── Fenêtre redimensionnable ──
+        # ── Fenêtre plein écran ──
         cv2.namedWindow("CatchMyHands", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("CatchMyHands", actual_w, actual_h)
+        cv2.setWindowProperty("CatchMyHands", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
         self.start_time = time.time()
         print("\n🎮 Contrôles :")

@@ -115,6 +115,21 @@ class GestureEngine:
 
         return result
 
+    def check_two_hand_frame(self, left_landmarks: np.ndarray, right_landmarks: np.ndarray) -> bool:
+        """
+        Détecte si le geste de cadre à deux mains est actif.
+        Vérifie si la distance entre le pouce gauche (4) et le pouce droit (4),
+        ainsi que la distance entre l'index gauche (8) et l'index droit (8),
+        sont toutes deux inférieures au seuil configuré.
+        """
+        if left_landmarks is None or right_landmarks is None:
+            return False
+
+        thumb_dist = self._euclidean_2d(left_landmarks[4], right_landmarks[4])
+        index_dist = self._euclidean_2d(left_landmarks[8], right_landmarks[8])
+
+        return thumb_dist < config.FRAME_GESTURE_THRESHOLD and index_dist < config.FRAME_GESTURE_THRESHOLD
+
     def _euclidean_2d(self, p1: np.ndarray, p2: np.ndarray) -> float:
         """Distance euclidienne 2D entre deux landmarks (x, y)."""
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)

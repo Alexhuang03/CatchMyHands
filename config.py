@@ -86,3 +86,12 @@ HUD_FONT_SCALE = 0.6                  # Taille de police
 HUD_COLOR = (255, 255, 255)           # Couleur texte (blanc)
 HUD_BG_COLOR = (0, 0, 0)             # Couleur fond
 HUD_POSITION = (10, 30)               # Position du FPS counter
+
+# ──────────────────────────────────────────
+# 🖼️ Effet Cadre Interactif (Deux mains)
+# ──────────────────────────────────────────
+FRAME_GESTURE_THRESHOLD = 0.08        # Distance normalisée max pour valider le contact des doigts
+FRAME_COLOR = (255, 230, 50)          # Couleur BGR du cadre (bleu cyan néon)
+FRAME_LINE_THICKNESS = 2              # Épaisseur des lignes de bordure
+FRAME_FILL_OPACITY = 0.2              # Opacité du remplissage (0.0 = transparent, 1.0 = opaque)
+

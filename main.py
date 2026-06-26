@@ -17,6 +17,14 @@ import os
 import sys
 import time
 
+# Prévenir les plantages d'encodage sur Windows (ex. console GBK/CP936)
+if sys.platform.startswith('win'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        pass
+
 import cv2
 import numpy as np
 
@@ -28,6 +36,7 @@ from core.safety import SafetyGuard
 from effects.drawing import DrawingEffect
 from effects.overlay import OverlayEffect
 from effects.skeleton import SkeletonRenderer
+from effects.box_frame import BoxFrameEffect
 from utils.fps_counter import FPSCounter
 
 
@@ -54,6 +63,7 @@ class CatchMyHands:
         self.drawing = DrawingEffect(config.CAMERA_WIDTH, config.CAMERA_HEIGHT)
         self.overlay = OverlayEffect()
         self.skeleton = SkeletonRenderer()
+        self.box_frame = BoxFrameEffect()
 
         # ── État ──
         self.show_skeleton = config.SKELETON_ENABLED_DEFAULT
@@ -61,6 +71,7 @@ class CatchMyHands:
         self.frame_count = 0
         self.start_time = None
         self._last_frame = None  # Dernière frame pour le screenshot
+        self._smoothed_hands_this_frame = []
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
         self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
@@ -111,9 +122,14 @@ class CatchMyHands:
 
                 # ── Traiter chaque main détectée ──
                 num_hands = self.detector.get_num_hands_detected()
+                self._smoothed_hands_this_frame = []
 
                 for hand_idx in range(num_hands):
                     frame = self._process_hand(frame, hand_idx)
+
+                # ── Geste et effet à deux mains ──
+                if num_hands == 2:
+                    frame = self._process_two_hands(frame)
 
                 # ── HUD (Heads-Up Display) ──
                 frame = self._render_hud(frame, num_hands)
@@ -162,6 +178,8 @@ class CatchMyHands:
         if not safety_report["valid"]:
             return frame
 
+        self._smoothed_hands_this_frame.append(smoothed)
+
         edge_factor = safety_report["edge_factor"]
 
         # ── Détection de geste ──
@@ -207,6 +225,30 @@ class CatchMyHands:
             frame = self.skeleton.render(
                 frame, smoothed, handedness, edge_factor
             )
+
+        return frame
+
+    def _process_two_hands(self, frame: np.ndarray) -> np.ndarray:
+        """
+        Gère le geste et l'effet à deux mains lorsque deux mains sont détectées.
+        """
+        if len(self._smoothed_hands_this_frame) < 2:
+            return frame
+
+        smoothed0 = self._smoothed_hands_this_frame[0]
+        smoothed1 = self._smoothed_hands_this_frame[1]
+
+        # Déterminer quelle main est à gauche et à droite sur l'écran (selon coordonnée X du poignet)
+        if smoothed0[0][0] < smoothed1[0][0]:
+            lm_left, lm_right = smoothed0, smoothed1
+        else:
+            lm_left, lm_right = smoothed1, smoothed0
+
+        # Vérifier si le geste de cadre est actif
+        is_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
+
+        if is_frame_active:
+            frame = self.box_frame.render(frame, lm_left, lm_right)
 
         return frame
 

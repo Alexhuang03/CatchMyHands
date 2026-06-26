@@ -1,0 +1,103 @@
+"""
+CatchMyHands - Box Frame Effect
+==================================
+Effet de cadre néon interactif dessiné entre les deux mains (pouces et index).
+Affiche un polygone translucide avec des bordures néon et des réticules de visée.
+"""
+
+import cv2
+import numpy as np
+import config
+
+class BoxFrameEffect:
+    """
+    Gère le rendu visuel du cadre interactif lorsque les index et pouces
+    des deux mains se touchent pour former un cadre.
+    """
+
+    def __init__(self):
+        pass
+
+    def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray) -> np.ndarray:
+        """
+        Dessine le cadre néon et les effets visuels associés sur l'image.
+
+        Args:
+            frame: L'image BGR d'OpenCV.
+            left_landmarks: Landmarks de la main gauche (21, 3).
+            right_landmarks: Landmarks de la main droite (21, 3).
+
+        Returns:
+            L'image avec l'effet appliqué.
+        """
+        h, w = frame.shape[:2]
+
+        # ── Extraire les points clés en pixels ──
+        # Index 4 = THUMB_TIP, Index 8 = INDEX_TIP
+        l_thumb = (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))
+        l_index = (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h))
+        r_thumb = (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h))
+        r_index = (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h))
+
+        # Les 4 sommets du polygone (ordre pour former un quadrilatère fermé)
+        pts = np.array([l_index, r_index, r_thumb, l_thumb], dtype=np.int32)
+
+        # ── 1. Remplissage semi-transparent (Polygone) ──
+        overlay = frame.copy()
+        cv2.fillPoly(overlay, [pts], config.FRAME_COLOR)
+        cv2.addWeighted(overlay, config.FRAME_FILL_OPACITY, frame, 1.0 - config.FRAME_FILL_OPACITY, 0, frame)
+
+        # ── 2. Lignes de bordure néon (Effet de lueur) ──
+        # Lueur externe (largeur 6, couleur d'origine avec lissage LINE_AA)
+        cv2.polylines(frame, [pts], isClosed=True, color=config.FRAME_COLOR, thickness=6, lineType=cv2.LINE_AA)
+        
+        # Noyau interne brillant (largeur 2, couleur presque blanche pour simuler du néon)
+        neon_white = (
+            min(255, config.FRAME_COLOR[0] + 50),
+            min(255, config.FRAME_COLOR[1] + 50),
+            min(255, config.FRAME_COLOR[2] + 50)
+        )
+        cv2.polylines(frame, [pts], isClosed=True, color=neon_white, thickness=2, lineType=cv2.LINE_AA)
+
+        # ── 3. Dessiner des réticules/coins de visée aux 4 sommets ──
+        for pt in [l_index, r_index, r_thumb, l_thumb]:
+            self._draw_reticle(frame, pt)
+
+        # ── 4. Texte informatif central ──
+        # On calcule le centre géométrique du cadre
+        cx = int((l_thumb[0] + l_index[0] + r_thumb[0] + r_index[0]) / 4)
+        cy = int((l_thumb[1] + l_index[1] + r_thumb[1] + r_index[1]) / 4)
+        
+        # Dessiner le texte "ENERGY FRAME" au centre
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = "ENERGY FRAME"
+        text_size = cv2.getTextSize(text, font, 0.4, 1)[0]
+        text_x = cx - text_size[0] // 2
+        text_y = cy + text_size[1] // 2
+
+        # Ajouter un fond noir semi-transparent derrière le texte pour la lisibilité
+        padding = 4
+        cv2.rectangle(frame, 
+                      (text_x - padding, text_y - text_size[1] - padding),
+                      (text_x + text_size[0] + padding, text_y + padding),
+                      (0, 0, 0), -1)
+        
+        cv2.putText(frame, text, (text_x, text_y), font, 0.4, neon_white, 1, cv2.LINE_AA)
+
+        return frame
+
+    def _draw_reticle(self, frame: np.ndarray, pt: tuple):
+        """Dessine un petit réticule de visée futuriste autour d'un point."""
+        x, y = pt
+        size = 10
+        color = config.FRAME_COLOR
+        thickness = 1
+
+        # Cercle central
+        cv2.circle(frame, (x, y), 3, color, -1, lineType=cv2.LINE_AA)
+
+        # Lignes en croix
+        cv2.line(frame, (x - size, y), (x - 4, y), color, thickness, lineType=cv2.LINE_AA)
+        cv2.line(frame, (x + size, y), (x + 4, y), color, thickness, lineType=cv2.LINE_AA)
+        cv2.line(frame, (x, y - size), (x, y - 4), color, thickness, lineType=cv2.LINE_AA)
+        cv2.line(frame, (x, y + size), (x, y + 4), color, thickness, lineType=cv2.LINE_AA)

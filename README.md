@@ -1,4 +1,4 @@
-# CatchMyHands 🖐️
+# CatchMyHands 
 
 > Système de Vision par Ordinateur Interactive en temps réel — Détection des mains et des doigts avec effets visuels AR.
 
@@ -16,12 +16,12 @@ Utilise **MediaPipe Hands** (Google AI Edge) pour détecter les 21 points de rep
 
 ### Bonus techniques
 
-- 🔧 Filtre EMA anti-jittering (lissage des tremblements)
-- 🛡️ Sécurité occlusion & sortie de cadre
-- 📊 HUD temps réel (FPS, geste détecté, nombre de mains)
-- 🦴 Squelette debug avec code couleur par doigt
+- Filtre EMA anti-jittering (lissage des tremblements)
+- Sécurité occlusion & sortie de cadre
+- HUD temps réel (FPS, geste détecté, nombre de mains)
+- Squelette debug avec code couleur par doigt
 
-## 🚀 Installation
+## Installation
 
 ```bash
 # Cloner le projet

@@ -32,15 +32,19 @@ class BoxFrameEffect:
         """
         h, w = frame.shape[:2]
 
-        # ── Extraire les points clés en pixels ──
-        # Index 4 = THUMB_TIP, Index 8 = INDEX_TIP
-        l_thumb = (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))
-        l_index = (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h))
-        r_thumb = (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h))
-        r_index = (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h))
+        # Calculer le point de pincement pour chaque main (milieu entre pouce et index)
+        l_px = int((left_landmarks[4][0] + left_landmarks[8][0]) / 2.0 * w)
+        l_py = int((left_landmarks[4][1] + left_landmarks[8][1]) / 2.0 * h)
+        r_px = int((right_landmarks[4][0] + right_landmarks[8][0]) / 2.0 * w)
+        r_py = int((right_landmarks[4][1] + right_landmarks[8][1]) / 2.0 * h)
 
-        # Les 4 sommets du polygone (ordre pour former un quadrilatère fermé)
-        pts = np.array([l_index, r_index, r_thumb, l_thumb], dtype=np.int32)
+        # Les 4 sommets du rectangle aligné sur les axes
+        pts = np.array([
+            (l_px, l_py),
+            (r_px, l_py),
+            (r_px, r_py),
+            (l_px, r_py)
+        ], dtype=np.int32)
 
         # ── 1. Remplissage semi-transparent (Polygone) ──
         overlay = frame.copy()
@@ -60,13 +64,13 @@ class BoxFrameEffect:
         cv2.polylines(frame, [pts], isClosed=True, color=neon_white, thickness=2, lineType=cv2.LINE_AA)
 
         # ── 3. Dessiner des réticules/coins de visée aux 4 sommets ──
-        for pt in [l_index, r_index, r_thumb, l_thumb]:
+        for pt in [(l_px, l_py), (r_px, l_py), (r_px, r_py), (l_px, r_py)]:
             self._draw_reticle(frame, pt)
 
         # ── 4. Texte informatif central ──
         # On calcule le centre géométrique du cadre
-        cx = int((l_thumb[0] + l_index[0] + r_thumb[0] + r_index[0]) / 4)
-        cy = int((l_thumb[1] + l_index[1] + r_thumb[1] + r_index[1]) / 4)
+        cx = int((l_px + r_px) / 2)
+        cy = int((l_py + r_py) / 2)
         
         # Dessiner le texte "ENERGY FRAME" au centre
         font = cv2.FONT_HERSHEY_SIMPLEX

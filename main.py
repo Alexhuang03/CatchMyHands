@@ -72,6 +72,7 @@ class CatchMyHands:
         self.start_time = None
         self._last_frame = None  # Dernière frame pour le screenshot
         self._smoothed_hands_this_frame = []
+        self.is_two_hand_frame_active = False
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
         self._FIST_COOLDOWN_FRAMES = 60  # ~2s à 30 FPS
@@ -130,6 +131,8 @@ class CatchMyHands:
                 # ── Geste et effet à deux mains ──
                 if num_hands == 2:
                     frame = self._process_two_hands(frame)
+                else:
+                    self.is_two_hand_frame_active = False
 
                 # ── HUD (Heads-Up Display) ──
                 frame = self._render_hud(frame, num_hands)
@@ -189,11 +192,13 @@ class CatchMyHands:
         # ── Appliquer les effets ──
 
         # Effet dessin (pincement)
+        # Si le cadre à deux mains est actif, on désactive le dessin pour cette frame
+        is_pinching = (gesture.gesture_type == GestureType.PINCH) and not self.is_two_hand_frame_active
         if gesture.pinch_position:
             self.drawing.update(
                 hand_idx,
                 gesture.pinch_position,
-                gesture.gesture_type == GestureType.PINCH
+                is_pinching
             )
 
         # Effet overlay aura (main ouverte)
@@ -245,9 +250,9 @@ class CatchMyHands:
             lm_left, lm_right = smoothed1, smoothed0
 
         # Vérifier si le geste de cadre est actif
-        is_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
+        self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
-        if is_frame_active:
+        if self.is_two_hand_frame_active:
             frame = self.box_frame.render(frame, lm_left, lm_right)
 
         return frame

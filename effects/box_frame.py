@@ -16,7 +16,7 @@ class BoxFrameEffect:
     """
 
     def __init__(self):
-        pass
+        self.last_box = None  # (x1, y1, x2, y2) de la dernière frame
 
     def render(self, frame: np.ndarray, left_landmarks: np.ndarray, right_landmarks: np.ndarray, bw_filter: bool = False) -> np.ndarray:
         """
@@ -46,6 +46,9 @@ class BoxFrameEffect:
             (r_px, r_py),
             (l_px, r_py)
         ], dtype=np.int32)
+
+        # Sauvegarder la bounding box pour l'effet de bris de glace
+        self.last_box = (min(l_px, r_px), min(l_py, r_py), max(l_px, r_px), max(l_py, r_py))
 
         # ── Option 1 : Filtre Noir et Blanc à l'intérieur du cadre ──
         if bw_filter:

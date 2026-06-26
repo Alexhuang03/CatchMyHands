@@ -36,6 +36,7 @@ from core.safety import SafetyGuard
 from effects.overlay import OverlayEffect
 from effects.skeleton import SkeletonRenderer
 from effects.box_frame import BoxFrameEffect
+from effects.glass_shatter import GlassShatterEffect
 from effects.menu_hud import MenuHUDEffect
 from utils.fps_counter import FPSCounter
 
@@ -63,6 +64,7 @@ class CatchMyHands:
         self.overlay = OverlayEffect()
         self.skeleton = SkeletonRenderer()
         self.box_frame = BoxFrameEffect()
+        self.glass_shatter = GlassShatterEffect()
         self.menu_hud = MenuHUDEffect()
 
         # ── État ──
@@ -73,6 +75,7 @@ class CatchMyHands:
         self._last_frame = None  # Dernière frame pour le screenshot
         self._smoothed_hands_this_frame = []
         self.is_two_hand_frame_active = False
+        self._was_frame_active = False  # Pour détecter la transition active → inactive
         self.option_bw_active = False
         # Cooldown pour le geste FIST (évite l'effacement en boucle)
         self._fist_cooldown: dict[int, int] = {}  # hand_idx → frames restants
@@ -132,7 +135,20 @@ class CatchMyHands:
                 if num_hands == 2:
                     frame = self._process_two_hands(frame)
                 else:
+                    # Détecter la disparition du cadre pour déclencher le bris de glace
+                    if self._was_frame_active and self.option_bw_active:
+                        if self.box_frame.last_box is not None:
+                            x1, y1, x2, y2 = self.box_frame.last_box
+                            self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=True)
+                            self.box_frame.last_box = None
                     self.is_two_hand_frame_active = False
+
+                # Mettre à jour l'état précédent
+                self._was_frame_active = self.is_two_hand_frame_active
+
+                # ── Animation bris de glace ──
+                if self.glass_shatter.is_animating:
+                    frame = self.glass_shatter.render(frame)
 
                 # ── HUD (Heads-Up Display) ──
                 frame = self._render_hud(frame, num_hands)
@@ -232,10 +248,17 @@ class CatchMyHands:
             lm_left, lm_right = smoothed1, smoothed0
 
         # Vérifier si le geste de cadre est actif
+        was_active_before = self.is_two_hand_frame_active
         self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
         if self.is_two_hand_frame_active:
             frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active)
+        elif was_active_before and self.option_bw_active:
+            # Le cadre vient de disparaître → déclencher le bris de glace
+            if self.box_frame.last_box is not None:
+                x1, y1, x2, y2 = self.box_frame.last_box
+                self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=True)
+                self.box_frame.last_box = None
 
         return frame
 

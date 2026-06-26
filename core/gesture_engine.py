@@ -119,20 +119,42 @@ class GestureEngine:
         """
         Détecte si le geste de cadre à deux mains est actif.
         Le cadre est activé si les deux mains effectuent un pincement (pouce + index serrés)
-        en même temps.
+        en même temps. Implémente une hystérésis robuste pour éviter le flickering.
         """
         if left_landmarks is None or right_landmarks is None:
+            self._frame_stable_count = 0
             return False
 
-        # Distance pouce-index pour la main gauche
+        # Distance pouce-index pour chaque main
         left_pinch = self._euclidean_2d(left_landmarks[4], left_landmarks[8])
-        # Distance pouce-index pour la main droite
         right_pinch = self._euclidean_2d(right_landmarks[4], right_landmarks[8])
 
-        # Utilise le seuil de relâchement de pincement pour plus de tolérance
-        threshold = config.PINCH_RELEASE_THRESHOLD
+        # Initialiser les attributs d'hystérésis si nécessaire
+        if not hasattr(self, '_two_hand_frame_active'):
+            self._two_hand_frame_active = False
+            self._frame_stable_count = 0
 
-        return left_pinch < threshold and right_pinch < threshold
+        if self._two_hand_frame_active:
+            # Seuil de relâchement plus large : il faut que les doigts s'écartent nettement
+            release_threshold = config.PINCH_RELEASE_THRESHOLD + 0.03
+            both_still_pinching = left_pinch < release_threshold and right_pinch < release_threshold
+
+            if both_still_pinching:
+                self._frame_stable_count = 0
+            else:
+                self._frame_stable_count += 1
+                # Exiger N frames consécutives hors pincement pour désactiver
+                if self._frame_stable_count >= 8:
+                    self._two_hand_frame_active = False
+                    self._frame_stable_count = 0
+        else:
+            # Seuil d'activation strict
+            activate_threshold = config.PINCH_THRESHOLD
+            if left_pinch < activate_threshold and right_pinch < activate_threshold:
+                self._two_hand_frame_active = True
+                self._frame_stable_count = 0
+
+        return self._two_hand_frame_active
 
     def _euclidean_2d(self, p1: np.ndarray, p2: np.ndarray) -> float:
         """Distance euclidienne 2D entre deux landmarks (x, y)."""

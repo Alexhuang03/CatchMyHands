@@ -96,13 +96,13 @@ class GestureEngine:
             result.gesture_type = GestureType.PINCH
             result.confidence = max(0.0, 1.0 - (pinch_dist / config.PINCH_RELEASE_THRESHOLD))
 
-        elif num_extended >= 4 and fingers_extended[0]:
-            # Main ouverte : au moins 4 doigts étendus + pouce
+        elif num_extended >= 4:
+            # Main ouverte : au moins 4 doigts étendus (robuste aux variations du pouce)
             result.gesture_type = GestureType.OPEN_HAND
             result.confidence = num_extended / 5.0
 
-        elif num_extended <= 1 and not fingers_extended[0]:
-            # Poing fermé : max 1 doigt étendu et pouce replié
+        elif num_extended <= 1:
+            # Poing fermé : max 1 doigt étendu (robuste aux variations du pouce)
             result.gesture_type = GestureType.FIST
             result.confidence = 1.0 - (num_extended / 5.0)
 
@@ -192,10 +192,11 @@ class GestureEngine:
         extended = []
 
         # ── Pouce ──
-        # Le pouce est étendu si le tip est plus éloigné du centre de la paume
-        # que l'articulation IP
-        thumb_tip_dist = self._euclidean_2d(landmarks[4], landmarks[9])
-        thumb_ip_dist = self._euclidean_2d(landmarks[3], landmarks[9])
+        # Le pouce est étendu si le tip est plus éloigné de la base de l'auriculaire (landmark 17)
+        # que l'articulation IP. Le landmark 17 est à l'opposé du pouce, ce qui rend cette
+        # détection robuste aux rotations de la main et aux effets de perspective.
+        thumb_tip_dist = self._euclidean_2d(landmarks[4], landmarks[17])
+        thumb_ip_dist = self._euclidean_2d(landmarks[3], landmarks[17])
         extended.append(thumb_tip_dist > thumb_ip_dist)
 
         # ── Index, Majeur, Annulaire, Auriculaire ──

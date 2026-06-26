@@ -159,7 +159,14 @@ class HandDetector:
         if result is None or hand_index >= len(result.handedness):
             return None
 
-        return result.handedness[hand_index][0].category_name
+        label = result.handedness[hand_index][0].category_name
+        # Inverser car le frame est flippé horizontalement (miroir)
+        # MediaPipe détecte sur l'image originale, donc Left ↔ Right
+        if label == "Left":
+            return "Right"
+        elif label == "Right":
+            return "Left"
+        return label
 
     def get_num_hands_detected(self):
         """Retourne le nombre de mains actuellement détectées."""

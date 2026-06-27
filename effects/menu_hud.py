@@ -98,10 +98,9 @@ class MenuHUDEffect:
         status2_color = config.MENU_COLOR_ACTIVE if option_pixelate_active else config.MENU_COLOR_INACTIVE
         cv2.putText(frame, status2_text, (x2 - 45, y_offset), font, 0.45, status2_color, 2, cv2.LINE_AA)
 
-        # --- SECTION INFO BAS ---
         cv2.line(frame, (x1 + 15, y2 - 55), (x2 - 15, y2 - 55), (60, 60, 60), 1, cv2.LINE_AA)
         cv2.putText(frame, "TOGGLES : 1, 2", (x1 + 15, y2 - 40), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
-        cv2.putText(frame, "PINCH BOTH HANDS", (x1 + 15, y2 - 25), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
+        cv2.putText(frame, "L-SHAPE BOTH HANDS", (x1 + 15, y2 - 25), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
         cv2.putText(frame, "TO ACTIVATE FRAME", (x1 + 15, y2 - 10), font, 0.35, (120, 120, 120), 1, cv2.LINE_AA)
 
         return frame

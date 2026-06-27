@@ -36,7 +36,6 @@ from core.safety import SafetyGuard
 from effects.overlay import OverlayEffect
 from effects.skeleton import SkeletonRenderer
 from effects.box_frame import BoxFrameEffect
-from effects.glass_shatter import GlassShatterEffect
 from effects.menu_hud import MenuHUDEffect
 from utils.fps_counter import FPSCounter
 
@@ -64,7 +63,6 @@ class CatchMyHands:
         self.overlay = OverlayEffect()
         self.skeleton = SkeletonRenderer()
         self.box_frame = BoxFrameEffect()
-        self.glass_shatter = GlassShatterEffect()
         self.menu_hud = MenuHUDEffect()
 
         # ── État ──
@@ -75,14 +73,18 @@ class CatchMyHands:
         self._last_frame = None  # Dernière frame pour le screenshot
         self._smoothed_hands_this_frame = []
         self.is_two_hand_frame_active = False
-        self._was_frame_active = False  # Pour détecter la transition active → inactive
         self.option_bw_active = False
         self.option_pixelate_active = False
 
     def run(self):
         """Lance la boucle principale."""
         # ── Ouvrir la caméra ──
-        cap = cv2.VideoCapture(config.CAMERA_INDEX)
+        # Utiliser cv2.CAP_DSHOW sur Windows pour forcer le support des hauts framerates (ex: 60 FPS)
+        if sys.platform.startswith('win'):
+            cap = cv2.VideoCapture(config.CAMERA_INDEX, cv2.CAP_DSHOW)
+        else:
+            cap = cv2.VideoCapture(config.CAMERA_INDEX)
+
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
         cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
@@ -135,20 +137,7 @@ class CatchMyHands:
                 if num_hands == 2:
                     frame = self._process_two_hands(frame)
                 else:
-                    # Détecter la disparition du cadre pour déclencher le bris de glace
-                    if self._was_frame_active and (self.option_bw_active or self.option_pixelate_active):
-                        if self.box_frame.last_box is not None:
-                            x1, y1, x2, y2 = self.box_frame.last_box
-                            self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=self.option_bw_active)
-                            self.box_frame.last_box = None
                     self.is_two_hand_frame_active = False
-
-                # Mettre à jour l'état précédent
-                self._was_frame_active = self.is_two_hand_frame_active
-
-                # ── Animation bris de glace ──
-                if self.glass_shatter.is_animating:
-                    frame = self.glass_shatter.render(frame)
 
                 # ── HUD (Heads-Up Display) ──
                 frame = self._render_hud(frame, num_hands)
@@ -218,8 +207,8 @@ class CatchMyHands:
         handedness = self.detector.get_handedness(hand_idx)
 
         # ── Appliquer les effets ──
-        # Ne pas dessiner les effets individuels (aura et squelette) si le cadre à deux mains est actif ou en cours de transition
-        is_frame_rendering = self.is_two_hand_frame_active or self._was_frame_active
+        # Ne pas dessiner les effets individuels (aura et squelette) si le cadre à deux mains est actif
+        is_frame_rendering = self.is_two_hand_frame_active
 
         if not is_frame_rendering:
             # Effet overlay aura (main ouverte)
@@ -256,17 +245,10 @@ class CatchMyHands:
             lm_left, lm_right = smoothed1, smoothed0
 
         # Vérifier si le geste de cadre est actif
-        was_active_before = self.is_two_hand_frame_active
         self.is_two_hand_frame_active = self.gesture_engine.check_two_hand_frame(lm_left, lm_right)
 
         if self.is_two_hand_frame_active:
             frame = self.box_frame.render(frame, lm_left, lm_right, bw_filter=self.option_bw_active, pix_filter=self.option_pixelate_active)
-        elif was_active_before and (self.option_bw_active or self.option_pixelate_active):
-            # Le cadre vient de disparaître → déclencher le bris de glace
-            if self.box_frame.last_box is not None:
-                x1, y1, x2, y2 = self.box_frame.last_box
-                self.glass_shatter.trigger(frame, x1, y1, x2, y2, bw_active=self.option_bw_active)
-                self.box_frame.last_box = None
 
         return frame
 

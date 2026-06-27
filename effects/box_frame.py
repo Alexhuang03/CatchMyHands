@@ -17,7 +17,6 @@ class BoxFrameEffect:
     """
 
     def __init__(self):
-        self.last_box = None  # (x1, y1, x2, y2) de la dernière frame
         self.minecraft_pixelate = MinecraftEffect()
 
     def close(self):
@@ -42,19 +41,24 @@ class BoxFrameEffect:
 
         # Les 4 sommets du polygone définis par les index et les pouces
         pts = np.array([
-            (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h)),   # Top-Left (Index Gauche)
-            (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h)), # Top-Right (Index Droit)
-            (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h)), # Bottom-Right (Pouce Droit)
-            (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))    # Bottom-Left (Pouce Gauche)
+            (int(left_landmarks[8][0] * w), int(left_landmarks[8][1] * h)),   # Index Gauche
+            (int(right_landmarks[8][0] * w), int(right_landmarks[8][1] * h)), # Index Droit
+            (int(right_landmarks[4][0] * w), int(right_landmarks[4][1] * h)), # Pouce Droit
+            (int(left_landmarks[4][0] * w), int(left_landmarks[4][1] * h))    # Pouce Gauche
         ], dtype=np.int32)
 
-        # Calculer la bounding box pour l'effet de bris de glace et les opérations de filtrage
+        # Trier les points par angle polaire par rapport au centre de gravité.
+        # Cela empêche le polygone de se croiser (effet sablier) lorsque les mains sont inclinées ou inversées.
+        cx = np.mean(pts[:, 0])
+        cy = np.mean(pts[:, 1])
+        angles = np.arctan2(pts[:, 1] - cy, pts[:, 0] - cx)
+        pts = pts[np.argsort(angles)]
+
+        # Calculer la bounding box pour les opérations de filtrage
         x1 = max(0, int(np.min(pts[:, 0])))
         x2 = min(w, int(np.max(pts[:, 0])))
         y1 = max(0, int(np.min(pts[:, 1])))
         y2 = min(h, int(np.max(pts[:, 1])))
-
-        self.last_box = (x1, y1, x2, y2)
 
         # Appliquer les filtres dans le polygone
         if (bw_filter or pix_filter) and (x2 > x1 and y2 > y1):

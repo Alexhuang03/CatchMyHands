@@ -152,16 +152,21 @@ class GestureEngine:
         return self._two_hand_frame_active
 
     def _is_l_shape(self, landmarks: np.ndarray) -> bool:
-        """Vérifie si la main fait un geste de L (index + pouce étendus, majeur/annulaire repliés)."""
+        """Vérifie si la main fait un geste de L (index + pouce étendus, au plus 3 doigts étendus au total)."""
         if landmarks is None or len(landmarks) < 21:
             return False
         fingers_extended = self._check_fingers_extended(landmarks)
-        # Pouce (0) et Index (1) étendus, Majeur (2) et Annulaire (3) repliés pour robustesse
-        return fingers_extended[0] and fingers_extended[1] and not fingers_extended[2] and not fingers_extended[3]
+        num_extended = sum(fingers_extended)
+        # Pouce et index doivent être étendus, et pas plus de 3 doigts étendus au total (pour la robustesse au bruit)
+        return fingers_extended[0] and fingers_extended[1] and (num_extended <= 3)
 
     def _euclidean_2d(self, p1: np.ndarray, p2: np.ndarray) -> float:
         """Distance euclidienne 2D entre deux landmarks (x, y)."""
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+
+    def _euclidean_3d(self, p1: np.ndarray, p2: np.ndarray) -> float:
+        """Distance euclidienne 3D entre deux landmarks (x, y, z)."""
+        return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2)
 
     def _compute_palm_center(self, landmarks: np.ndarray) -> Tuple[float, float]:
         """
@@ -184,10 +189,7 @@ class GestureEngine:
     def _check_fingers_extended(self, landmarks: np.ndarray) -> list:
         """
         Vérifie quels doigts sont étendus.
-
-        Pour le pouce : compare la distance TIP→INDEX_MCP vs IP→INDEX_MCP.
-        Pour les autres doigts : compare TIP.y < PIP.y (en coordonnées normalisées,
-        y=0 est en haut).
+        Utilise les coordonnées 3D pour être parfaitement invariant aux rotations/angles.
 
         Returns:
             Liste de 5 booléens [pouce, index, majeur, annulaire, auriculaire].
@@ -195,21 +197,21 @@ class GestureEngine:
         extended = []
 
         # ── Pouce ──
-        # Le pouce est étendu si le tip est plus éloigné de la base de l'auriculaire (landmark 17)
-        # que l'articulation IP. Le landmark 17 est à l'opposé du pouce, ce qui rend cette
-        # détection robuste aux rotations de la main et aux effets de perspective.
-        thumb_tip_dist = self._euclidean_2d(landmarks[4], landmarks[17])
-        thumb_ip_dist = self._euclidean_2d(landmarks[3], landmarks[17])
+        # Le pouce est étendu si le tip (4) est plus éloigné de la base de l'auriculaire (17)
+        # que l'articulation IP (3) en 3D.
+        thumb_tip_dist = self._euclidean_3d(landmarks[4], landmarks[17])
+        thumb_ip_dist = self._euclidean_3d(landmarks[3], landmarks[17])
         extended.append(thumb_tip_dist > thumb_ip_dist)
 
         # ── Index, Majeur, Annulaire, Auriculaire ──
-        # Un doigt est étendu si le TIP est plus haut (y plus petit) que le PIP
+        # On compare la distance TIP->Poignet vs PIP->Poignet en 3D.
         finger_tips = [8, 12, 16, 20]
         finger_pips = [6, 10, 14, 18]
 
         for tip_idx, pip_idx in zip(finger_tips, finger_pips):
-            # En coordonnées normalisées : y=0 en haut, y=1 en bas
-            # Le doigt est étendu si tip.y < pip.y (tip plus haut que pip)
-            extended.append(landmarks[tip_idx][1] < landmarks[pip_idx][1])
+            dist_tip = self._euclidean_3d(landmarks[tip_idx], landmarks[0])
+            dist_pip = self._euclidean_3d(landmarks[pip_idx], landmarks[0])
+            # Si le doigt est étendu, son bout (tip) est plus éloigné du poignet que le joint PIP
+            extended.append(dist_tip > dist_pip * 1.12)
 
         return extended

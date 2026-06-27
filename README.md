@@ -8,7 +8,9 @@
 
 **CatchMyHands** utilise **MediaPipe Hands** (Google AI Edge) pour détecter les 21 points de repère de chaque main en temps réel. Lorsque les deux mains forment un geste en L (pouces et index étendus, autres doigts repliés), elles créent un **cadre néon dynamique** dont les 4 coins se situent directement sur le bout des index et des pouces.
 
-À l'intérieur de ce cadre, plusieurs filtres avancés peuvent être appliqués et combinés à l'aide de raccourcis clavier. Lorsque le cadre est rompu, un effet visuel de **bris de glace (Glass Shatter)** se déclenche à l'emplacement du cadre.
+Le système est entièrement **robuste aux rotations** (fonctionne en paysage, portrait, diagonal) et trie géométriquement les sommets par rapport à leur centre de gravité. Cela empêche le cadre de se croiser (effet sablier) ou de se briser lorsque vos mains sont inversées (par exemple, pouce droit vers le haut et index droit vers le bas).
+
+À l'intérieur de ce cadre, plusieurs filtres avancés peuvent être appliqués et combinés à l'aide de raccourcis clavier.
 
 ---
 
@@ -20,7 +22,6 @@
 | :--- | :--- |
 | **Main ouverte** | Affiche une aura d'énergie cyan pulsante au centre de la paume (atténuation progressive aux bords). |
 | **Geste en L (Cadre)** | Forme un cadre néon reliant les index et les pouces des deux mains (4 coins définis directement par le bout des doigts). Les effets d'aura et de squelette sont masqués pendant l'activation. |
-| **Rupture du Cadre** | Déclenche instantanément une animation fluide de **bris de glace (Glass Shatter)** sur la zone où se trouvait le cadre. |
 | Touche **`1`** (ou `&`) | Active/Désactive l'**Option 1 : Scanner B&W** (convertit l'intérieur du cadre en noir et blanc). |
 | Touche **`2`** (ou `é`) | Active/Désactive l'**Option 2 : Pixelate** (effet mosaïque rétro pixelisé). |
 
@@ -85,7 +86,6 @@ CatchMyHands/
 │   └── safety.py        # Validations de sécurité (sortie de cadre, jumps de repères)
 ├── effects/
 │   ├── box_frame.py     # Effet de cadre néon et application des filtres intérieurs
-│   ├── glass_shatter.py # Animation de bris de glace lors de la rupture du cadre
 │   ├── menu_hud.py      # HUD latéral cyberpunk affichant le statut des filtres
 │   ├── minecraft_effect.py # Effet de pixelisation (Pixelate)
 │   ├── overlay.py       # Effet d'aura sur les mains ouvertes
@@ -101,7 +101,7 @@ CatchMyHands/
 
 ## 🗺️ Roadmap
 
-- [x] **Phase 1** : PoC local interactif (OpenCV + MediaPipe, Cadre Néon, Filtres combinables & Bris de glace)
+- [x] **Phase 1** : PoC local interactif (OpenCV + MediaPipe, Cadre Néon, Filtres combinables)
 - [ ] **Phase 2** : Conteneurisation Docker
 - [ ] **Phase 3** : Optimisation et déploiement Edge (Raspberry Pi)
 - [ ] **Phase 4** : Interface Web multi-utilisateurs (WebSockets/WebRTC)

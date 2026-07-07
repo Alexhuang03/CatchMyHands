@@ -39,6 +39,8 @@ from effects.skeleton import SkeletonRenderer
 from effects.box_frame import BoxFrameEffect
 from effects.menu_hud import MenuHUDEffect
 from effects.finger_filter import FingerFilterEffect
+from effects.main_menu import MainMenuRenderer
+from core.snake_game import SnakeGame
 from utils.fps_counter import FPSCounter
 
 
@@ -136,6 +138,13 @@ class CatchMyHands:
         # Filtres activés dans l'ordre d'activation (ex: ["bw", "pixelate"])
         self.active_filters_ordered = []
 
+        # ── Composants Menu et Jeux ──
+        self.main_menu = MainMenuRenderer()
+        self.snake_game = SnakeGame()
+        self.state = "MENU"  # "MENU", "FILTERS", "GAMES"
+        self.width = config.CAMERA_WIDTH
+        self.height = config.CAMERA_HEIGHT
+
     def run(self):
         """Lance la boucle principale."""
         # ── Ouvrir la caméra ──
@@ -174,6 +183,8 @@ class CatchMyHands:
 
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.width = actual_w
+        self.height = actual_h
         actual_fps = cap.get(cv2.CAP_PROP_FPS)
         print(f"[Camera] Ouverte — {actual_w}x{actual_h} @ {actual_fps:.0f} FPS")
 
@@ -211,17 +222,38 @@ class CatchMyHands:
                 for hand_idx in range(num_hands):
                     self._collect_hand_data(hand_idx)
 
-                # ── Rendre tous les effets de cadres (bi-manuel ou solo) ──
-                frame = self._render_frame_effects(frame)
+                # ── Rendu selon l'état actuel ──
+                if self.state == "MENU":
+                    # Squelettes en arrière-plan si activé
+                    if self.show_skeleton:
+                        for hand_data in self._hands_metadata:
+                            frame = self.skeleton.render(frame, hand_data["smoothed"], hand_data["handedness"], hand_data["edge_factor"])
+                    
+                    frame, menu_action = self.main_menu.render(frame, self._hands_metadata)
+                    if menu_action == 1:
+                        self.state = "FILTERS"
+                        print("[Navigation] Filtres Visuels")
+                    elif menu_action == 2:
+                        self.state = "GAMES"
+                        self.snake_game.reset(self.width, self.height)
+                        print("[Navigation] Jeux (Snake)")
 
-                # ── HUD (Heads-Up Display) ──
-                frame = self._render_hud(frame, num_hands)
+                elif self.state == "FILTERS":
+                    # ── Rendre tous les effets de cadres (bi-manuel ou solo) ──
+                    frame = self._render_frame_effects(frame)
 
-                # ── Menu Latéral (Options) ──
-                frame = self.menu_hud.render(
-                    frame,
-                    self.active_filters_ordered
-                )
+                    # ── HUD (Heads-Up Display) ──
+                    frame = self._render_hud(frame, num_hands)
+
+                    # ── Menu Latéral (Options) ──
+                    frame = self.menu_hud.render(
+                        frame,
+                        self.active_filters_ordered
+                    )
+
+                elif self.state == "GAMES":
+                    # Mode Jeux (actuellement Snake)
+                    frame = self.snake_game.update_and_render(frame, self._hands_metadata)
 
                 # ── Affichage ──
                 cv2.imshow("CatchMyHands", frame)
@@ -408,7 +440,6 @@ class CatchMyHands:
                         (100, 100, 255), 1, cv2.LINE_AA)
 
         return frame
-
     def _handle_key(self, key: int) -> bool:
         """
         Gère les entrées clavier.
@@ -417,8 +448,19 @@ class CatchMyHands:
             False pour quitter, True sinon.
         """
         if key == ord('q') or key == 27:  # Q ou ESC
-            print("👋 Au revoir !")
-            return False
+            if self.state == "MENU":
+                print("👋 Au revoir !")
+                return False
+            else:
+                self.state = "MENU"
+                print("[Navigation] Retour au Menu Principal")
+                return True
+
+        elif key == ord('m') or key == ord('M'):
+            if self.state != "MENU":
+                self.state = "MENU"
+                print("[Navigation] Retour au Menu Principal")
+                return True
 
         elif key == ord('d'):
             self.show_skeleton = not self.show_skeleton
@@ -428,16 +470,32 @@ class CatchMyHands:
             self.skeleton.toggle_ids()
 
         elif key == ord('1') or key == ord('&'):
-            self._toggle_filter("bw")
+            if self.state == "FILTERS":
+                self._toggle_filter("bw")
+            elif self.state == "MENU":
+                self.state = "FILTERS"
+                print("[Navigation] Filtres Visuels")
 
         elif key == ord('2') or key == ord('é'):
-            self._toggle_filter("pixelate")
+            if self.state == "FILTERS":
+                self._toggle_filter("pixelate")
+            elif self.state == "MENU":
+                self.state = "GAMES"
+                self.snake_game.reset(self.width, self.height)
+                print("[Navigation] Jeux (Snake)")
 
         elif key == ord('3') or key == ord('"'):
-            self._toggle_filter("invert")
+            if self.state == "FILTERS":
+                self._toggle_filter("invert")
 
         elif key == ord('4') or key == ord('\''):
-            self._toggle_filter("edge")
+            if self.state == "FILTERS":
+                self._toggle_filter("edge")
+
+        elif key == ord('r') or key == ord('R'):
+            if self.state == "GAMES":
+                self.snake_game.reset(self.width, self.height)
+                print("[Jeu] Partie réinitialisée")
 
         elif key == ord('s'):
             self._take_screenshot()

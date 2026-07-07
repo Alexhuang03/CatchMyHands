@@ -55,20 +55,37 @@ class HandDetector:
         HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
 
-        # Configuration du HandLandmarker en mode LIVE_STREAM
-        options = HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=config.MODEL_PATH),
-            running_mode=VisionRunningMode.LIVE_STREAM,
-            num_hands=config.NUM_HANDS,
-            min_hand_detection_confidence=config.MIN_DETECTION_CONFIDENCE,
-            min_hand_presence_confidence=config.MIN_PRESENCE_CONFIDENCE,
-            min_tracking_confidence=config.MIN_TRACKING_CONFIDENCE,
-            result_callback=self._on_result,
-        )
+        # Configuration du délégué (GPU / CPU)
+        delegate = BaseOptions.Delegate.GPU if config.MODEL_DELEGATE == "GPU" else BaseOptions.Delegate.CPU
 
-        self._landmarker = HandLandmarker.create_from_options(options)
-        print(f"[HandDetector] Initialisé — max {config.NUM_HANDS} mains, "
-              f"confiance détection ≥ {config.MIN_DETECTION_CONFIDENCE}")
+        try:
+            options = HandLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=config.MODEL_PATH, delegate=delegate),
+                running_mode=VisionRunningMode.LIVE_STREAM,
+                num_hands=config.NUM_HANDS,
+                min_hand_detection_confidence=config.MIN_DETECTION_CONFIDENCE,
+                min_hand_presence_confidence=config.MIN_PRESENCE_CONFIDENCE,
+                min_tracking_confidence=config.MIN_TRACKING_CONFIDENCE,
+                result_callback=self._on_result,
+            )
+            self._landmarker = HandLandmarker.create_from_options(options)
+            print(f"[HandDetector] Initialisé avec accélération : {config.MODEL_DELEGATE}")
+        except Exception as e:
+            if delegate == BaseOptions.Delegate.GPU:
+                print(f"[HandDetector] ⚠ Échec d'activation GPU ({e}). Repli sur le CPU...")
+                options = HandLandmarkerOptions(
+                    base_options=BaseOptions(model_asset_path=config.MODEL_PATH, delegate=BaseOptions.Delegate.CPU),
+                    running_mode=VisionRunningMode.LIVE_STREAM,
+                    num_hands=config.NUM_HANDS,
+                    min_hand_detection_confidence=config.MIN_DETECTION_CONFIDENCE,
+                    min_hand_presence_confidence=config.MIN_PRESENCE_CONFIDENCE,
+                    min_tracking_confidence=config.MIN_TRACKING_CONFIDENCE,
+                    result_callback=self._on_result,
+                )
+                self._landmarker = HandLandmarker.create_from_options(options)
+                print("[HandDetector] Initialisé avec accélération : CPU (Fallback)")
+            else:
+                raise e
 
     def _ensure_model_exists(self):
         """Télécharge le modèle .task si absent du répertoire assets."""

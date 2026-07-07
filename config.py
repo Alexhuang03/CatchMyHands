@@ -8,15 +8,16 @@ Modifier ces valeurs pour adapter le comportement sans toucher au code.
 # ──────────────────────────────────────────
 # 📹 Caméra
 # ──────────────────────────────────────────
-CAMERA_INDEX = 0           # Index de la caméra (0 = webcam par défaut)
-CAMERA_WIDTH = 1280        # Largeur de capture en pixels
+CAMERA_INDEX = "auto"      # Identifiant de la caméra ("auto" = détection auto, 0 = interne, 2 = externe)
+CAMERA_WIDTH = 1280        # Largeur de capture en pixels (OpenCV ajustera selon le support de la caméra)
 CAMERA_HEIGHT = 720        # Hauteur de capture en pixels
-CAMERA_FPS = 60            # FPS demandés à la caméra (si supporté)
+CAMERA_FPS = 60            # FPS demandés à la caméra (si supporté, sinon repli automatique)
 
 # ──────────────────────────────────────────
 # 🧠 MediaPipe HandLandmarker
 # ──────────────────────────────────────────
 MODEL_PATH = "assets/hand_landmarker.task"  # Chemin vers le modèle
+MODEL_DELEGATE = "GPU"                 # Délégué pour l'inférence ("GPU" pour accélération graphique, "CPU" sinon)
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
     "hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"

@@ -16,6 +16,7 @@ Contrôles clavier :
 import os
 import sys
 import time
+import glob
 
 # Prévenir les plantages d'encodage sur Windows (ex. console GBK/CP936)
 if sys.platform.startswith('win'):
@@ -38,6 +39,61 @@ from effects.skeleton import SkeletonRenderer
 from effects.box_frame import BoxFrameEffect
 from effects.menu_hud import MenuHUDEffect
 from utils.fps_counter import FPSCounter
+
+
+def list_available_cameras():
+    """Détecte et liste les caméras disponibles sur la machine."""
+    cameras = []
+    if sys.platform.startswith('linux'):
+        for path in sorted(glob.glob('/sys/class/video4linux/video*')):
+            try:
+                device_num = int(path.split('/')[-1].replace('video', ''))
+                with open(os.path.join(path, 'name'), 'r') as f:
+                    name = f.read().strip()
+                dev_path = f"/dev/video{device_num}"
+                # Test d'ouverture rapide
+                cap = cv2.VideoCapture(dev_path)
+                if cap.isOpened():
+                    cameras.append((device_num, dev_path, name, True))
+                    cap.release()
+                else:
+                    cameras.append((device_num, dev_path, name, False))
+            except Exception:
+                pass
+    else:
+        # Windows / macOS fallback
+        for i in range(5):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                cameras.append((i, f"Index {i}", "Caméra générique", True))
+                cap.release()
+    return cameras
+
+
+def get_best_camera_index():
+    """
+    Détermine l'index de la meilleure caméra disponible.
+    Préfère une caméra externe branchée (index != 0) si disponible,
+    sinon se rabat sur la caméra interne (index 0).
+    """
+    cams = list_available_cameras()
+    valid_cams = [c for c in cams if c[3]]  # Garder uniquement celles avec OK=True
+    
+    if not valid_cams:
+        print("⚠ Aucune caméra fonctionnelle détectée sur le système, repli sur l'index 0.")
+        return 0
+        
+    # Chercher les caméras externes (index différent de 0)
+    external_cams = [c for c in valid_cams if c[0] != 0]
+    if external_cams:
+        best_cam = external_cams[0]
+        print(f"[Auto-Camera] Caméra externe détectée : Index {best_cam[0]} ({best_cam[1]}) - {best_cam[2]}")
+        return best_cam[0]
+        
+    # Sinon utiliser la caméra par défaut (index 0)
+    best_cam = valid_cams[0]
+    print(f"[Auto-Camera] Caméra interne par défaut : Index {best_cam[0]} ({best_cam[1]}) - {best_cam[2]}")
+    return best_cam[0]
 
 
 class CatchMyHands:
@@ -79,11 +135,20 @@ class CatchMyHands:
     def run(self):
         """Lance la boucle principale."""
         # ── Ouvrir la caméra ──
+        camera_id = config.CAMERA_INDEX
+        if camera_id == "auto":
+            camera_id = get_best_camera_index()
+        elif isinstance(camera_id, str) and camera_id.isdigit():
+            camera_id = int(camera_id)
+
         # Utiliser cv2.CAP_DSHOW sur Windows pour forcer le support des hauts framerates (ex: 60 FPS)
         if sys.platform.startswith('win'):
-            cap = cv2.VideoCapture(config.CAMERA_INDEX, cv2.CAP_DSHOW)
+            cap = cv2.VideoCapture(camera_id if isinstance(camera_id, int) else 0, cv2.CAP_DSHOW)
         else:
-            cap = cv2.VideoCapture(config.CAMERA_INDEX)
+            cap = cv2.VideoCapture(camera_id)
+
+        # Forcer le codec MJPEG pour un framerate optimal (évite le goulot d'étranglement USB)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
@@ -91,8 +156,16 @@ class CatchMyHands:
 
         if not cap.isOpened():
             print("❌ Impossible d'ouvrir la caméra !")
-            print(f"   Index testé : {config.CAMERA_INDEX}")
-            print("   Vérifiez que la webcam est connectée et accessible.")
+            print(f"   Identifiant testé : {config.CAMERA_INDEX}")
+            print("\n🔍 Détection des caméras disponibles sur le système :")
+            cams = list_available_cameras()
+            if cams:
+                for num, path, name, ok in cams:
+                    status = "Disponible ✅" if ok else "Indisponible (Flux occupé ou métadonnées seules) ❌"
+                    print(f"   - Index {num} ({path}) : {name} | Statut : {status}")
+                print("\n💡 Astuce : Modifiez CAMERA_INDEX dans config.py avec l'index ou le chemin souhaité.")
+            else:
+                print("   Aucune caméra détectée sur le système.")
             sys.exit(1)
 
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

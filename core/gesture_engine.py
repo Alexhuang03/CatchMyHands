@@ -115,6 +115,55 @@ class GestureEngine:
 
         return result
 
+    def detect_finger_pinches(self, landmarks: np.ndarray, hand_index: int = 0) -> list:
+        """
+        Détecte quels doigts sont en pinch avec le pouce.
+
+        Args:
+            landmarks: Array (21, 3) de landmarks normalisés (x, y, z).
+            hand_index: Index de la main (pour le suivi d'hystérésis par doigt).
+
+        Returns:
+            Liste de 4 booléens [index, middle, ring, pinky] indiquant
+            si chaque doigt est en pinch avec le pouce.
+        """
+        if landmarks is None or len(landmarks) < 21:
+            return [False, False, False, False]
+
+        # Initialiser l'état d'hystérésis par doigt si nécessaire
+        key = f"finger_pinch_{hand_index}"
+        if key not in self._prev_gestures:
+            self._prev_gestures[key] = [False, False, False, False]
+
+        prev_pinches = self._prev_gestures[key]
+
+        thumb_tip = landmarks[4]  # Bout du pouce
+        finger_tips = [8, 12, 16, 20]  # Index, Majeur, Annulaire, Auriculaire
+        finger_names = ["index", "middle", "ring", "pinky"]
+
+        pinches = []
+        for i, tip_idx in enumerate(finger_tips):
+            dist = self._euclidean_2d(thumb_tip, landmarks[tip_idx])
+            finger_name = finger_names[i]
+
+            # Récupérer les seuils spécifiques au doigt
+            thresh_pinch, thresh_release = config.FINGER_FILTER_THRESHOLDS.get(
+                finger_name, (0.06, 0.08)
+            )
+
+            # Hystérésis : seuil différent selon l'état précédent
+            if prev_pinches[i]:
+                threshold = thresh_release
+            else:
+                threshold = thresh_pinch
+
+            pinches.append(dist < threshold)
+
+        # Mémoriser l'état pour l'hystérésis
+        self._prev_gestures[key] = pinches
+
+        return pinches
+
     def check_two_hand_frame(self, left_landmarks: np.ndarray, right_landmarks: np.ndarray) -> bool:
         """
         Détecte si le geste de cadre à deux mains est actif.

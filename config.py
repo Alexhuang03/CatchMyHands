@@ -23,9 +23,9 @@ MODEL_URL = (
     "hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
 )
 NUM_HANDS = 2                          # Nombre max de mains détectées
-MIN_DETECTION_CONFIDENCE = 0.7         # Seuil confiance détection paume
-MIN_PRESENCE_CONFIDENCE = 0.5          # Seuil confiance présence main
-MIN_TRACKING_CONFIDENCE = 0.5          # Seuil confiance tracking
+MIN_DETECTION_CONFIDENCE = 0.5         # Seuil confiance détection paume
+MIN_PRESENCE_CONFIDENCE = 0.4          # Seuil confiance présence main
+MIN_TRACKING_CONFIDENCE = 0.4          # Seuil confiance tracking
 
 # ──────────────────────────────────────────
 # 🤏 Détection de gestes — Seuils
@@ -44,7 +44,7 @@ SMOOTHING_RESET_FRAMES = 5            # Frames sans détection avant reset du fi
 # ──────────────────────────────────────────
 # 🛡️ Sécurités
 # ──────────────────────────────────────────
-MIN_LANDMARKS_IN_FRAME = 15           # Min landmarks dans le cadre (sur 21)
+MIN_LANDMARKS_IN_FRAME = 10           # Min landmarks dans le cadre (sur 21, plus tolérant aux mains hors-champ)
 MAX_JUMP_RATIO = 0.3                  # Saut max entre 2 frames (ratio taille main)
 EDGE_FADE_MARGIN = 0.1                # Marge pour atténuation progressive aux bords
 
@@ -104,3 +104,34 @@ MENU_COLOR_INACTIVE = (128, 128, 128) # Gris pour les options inactives
 MINECRAFT_BLOCK_SIZE = 8              # Taille des blocs en pixels (plus grand = plus pixelisé)
 MINECRAFT_GRID_LINES = True           # Afficher la grille entre les blocs
 MINECRAFT_COLOR_REDUCE = True         # Réduire la palette de couleurs (look rétro)
+
+# ──────────────────────────────────────────
+# 🤏 Filtres par doigt (Mini-cadres)
+# ──────────────────────────────────────────
+# Seuils de détection de pincement (pinch) et de relâchement (release) par doigt.
+# Le majeur, l'annulaire et l'auriculaire ont des seuils plus élevés car leurs landmarks
+# sont naturellement plus éloignés du pouce lors d'un contact physique.
+FINGER_FILTER_THRESHOLDS = {
+    "index":  (0.06, 0.08),
+    "middle": (0.09, 0.11),
+    "ring":   (0.09, 0.11),
+    "pinky":  (0.09, 0.11),
+}
+FINGER_FILTER_BORDER_THICKNESS = 2    # Épaisseur de la bordure néon des mini-cadres
+FINGER_FILTER_GLOW_THICKNESS = 5      # Épaisseur de la lueur externe
+FINGER_FILTER_COLORS = {
+    "index":  (255, 128, 0),           # Orange néon (pouce ↔ index)
+    "middle": (0, 255, 128),           # Vert néon (pouce ↔ majeur)
+    "ring":   (255, 50, 255),          # Magenta néon (pouce ↔ annulaire)
+    "pinky":  (50, 200, 255),          # Cyan néon (pouce ↔ auriculaire)
+}
+# Noms des filtres disponibles (extensible)
+AVAILABLE_FILTERS = ["bw", "pixelate", "invert", "edge"]
+FILTER_DISPLAY_NAMES = {
+    "bw": "Scanner B&W",
+    "pixelate": "Pixelate",
+    "invert": "Inversion",
+    "edge": "Cyber Edge",
+}
+# Noms des doigts pour l'affichage
+FINGER_DISPLAY_NAMES = ["Index", "Majeur", "Annulaire", "Auriculaire"]

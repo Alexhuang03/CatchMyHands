@@ -405,16 +405,25 @@ class PongGame:
             # Pas de menace directe, suivre la première balle doucement
             threat_ball = self.balls[0]
 
-        # Erreur intentionnelle (change toutes les 2-3 secondes)
+        # Vitesse de la menace
+        ball_speed = math.sqrt(threat_ball["vx"]**2 + threat_ball["vy"]**2)
+
+        # Erreur intentionnelle (change toutes les 1 à 2 secondes)
         self.ai_error_timer -= 1
         if self.ai_error_timer <= 0:
-            self.ai_error_offset = random.uniform(-40, 40)
-            self.ai_error_timer = random.randint(120, 180)
+            self.ai_error_offset = random.uniform(-20, 20)
+            self.ai_error_timer = random.randint(60, 120)
 
-        target_x = threat_ball["x"] + self.ai_error_offset
+        # Rendre l'IA plus précise lorsque la balle se rapproche d'elle (haut de l'écran)
+        current_offset = self.ai_error_offset
+        if threat_ball["y"] < self.height * 0.45:
+            current_offset *= 0.4  # Réduit l'offset d'erreur de 60%
 
-        # Vitesse de l'IA augmente avec le score du joueur
-        current_ai_speed = self.ai_speed + min(3.0, self.score * 0.15)
+        target_x = threat_ball["x"] + current_offset
+
+        # La vitesse de base de l'IA s'adapte dynamiquement à la vitesse de la balle
+        # Elle augmente aussi légèrement avec le score de l'utilisateur pour le challenge
+        current_ai_speed = 6.0 + ball_speed * 0.4 + min(4.0, self.score * 0.2)
 
         # Déplacement avec limitation de vitesse
         diff = target_x - self.ai_paddle_x

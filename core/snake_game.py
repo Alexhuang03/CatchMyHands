@@ -41,7 +41,6 @@ class SnakeGame:
         self.margin_y = 80
         
         self.initialized = False
-
     def reset(self, w: int, h: int):
         """Réinitialise une partie."""
         self.width = w
@@ -56,12 +55,13 @@ class SnakeGame:
         start_x = w // 2
         start_y = h // 2
         
-        # Créer le serpent initial (5 segments horizontaux vers la gauche)
+        # Créer le serpent initial (8 segments horizontaux vers la gauche)
         spacing = 15
         self.segments = []
         for i in range(8):
             self.segments.append((float(start_x - i * spacing), float(start_y)))
             
+        self.angle = 0.0
         self.food = self._spawn_food()
         self.initialized = True
 
@@ -178,13 +178,14 @@ class SnakeGame:
             # La vitesse augmente légèrement avec le score
             speed = 6.0 + min(6.0, self.score // 60.0)
 
-            if dist > 8:
-                angle = math.atan2(dy, dx)
-                new_head_x = head_x + speed * math.cos(angle)
-                new_head_y = head_y + speed * math.sin(angle)
-            else:
-                new_head_x = head_x
-                new_head_y = head_y
+            # Si le doigt est suffisamment éloigné, on met à jour la direction.
+            # Sinon, le serpent continue tout droit dans sa direction actuelle
+            # (ce qui l'empêche de s'arrêter lorsqu'il atteint le doigt).
+            if dist > 20.0:
+                self.angle = math.atan2(dy, dx)
+
+            new_head_x = head_x + speed * math.cos(self.angle)
+            new_head_y = head_y + speed * math.sin(self.angle)
 
             # Mise à jour des coordonnées avec l'algorithme de chaîne IK
             self.segments[0] = (new_head_x, new_head_y)
@@ -207,9 +208,9 @@ class SnakeGame:
                 self._add_particle_burst(hx, hy, (50, 50, 255))
                 self._add_floating_text(hx, hy - 20, "CRASH !", (0, 0, 255))
 
-            # 2. Collision avec soi-même (exclure les 16 premiers segments pour la maniabilité)
+            # 2. Collision avec soi-même (exclure les 6 premiers segments pour la maniabilité)
             if not self.game_over:
-                for i in range(16, len(self.segments)):
+                for i in range(6, len(self.segments)):
                     seg = self.segments[i]
                     s_dist = math.sqrt((hx - seg[0]) ** 2 + (hy - seg[1]) ** 2)
                     if s_dist < 12.0:

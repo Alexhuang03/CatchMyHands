@@ -85,16 +85,17 @@ class GestureEngine:
         # ── Hystérésis pour le pincement ──
         prev_gesture = self._prev_gestures.get(hand_index, GestureType.NONE)
 
-        # Seuil dynamique avec hystérésis
+        # Seuil dynamique avec hystérésis, adapté à la taille de la main (profondeur)
+        scale_factor = result.hand_size / 0.11
         if prev_gesture == GestureType.PINCH:
-            pinch_threshold = config.PINCH_RELEASE_THRESHOLD
+            pinch_threshold = config.PINCH_RELEASE_THRESHOLD * scale_factor
         else:
-            pinch_threshold = config.PINCH_THRESHOLD
+            pinch_threshold = config.PINCH_THRESHOLD * scale_factor
 
         # ── Classification du geste ──
         if pinch_dist < pinch_threshold:
             result.gesture_type = GestureType.PINCH
-            result.confidence = max(0.0, 1.0 - (pinch_dist / config.PINCH_RELEASE_THRESHOLD))
+            result.confidence = max(0.0, 1.0 - (pinch_dist / (config.PINCH_RELEASE_THRESHOLD * scale_factor)))
 
         elif num_extended >= 4:
             # Main ouverte : au moins 4 doigts étendus (robuste aux variations du pouce)
@@ -141,6 +142,9 @@ class GestureEngine:
         finger_tips = [8, 12, 16, 20]  # Index, Majeur, Annulaire, Auriculaire
         finger_names = ["index", "middle", "ring", "pinky"]
 
+        hand_size = self._compute_hand_size(landmarks)
+        scale_factor = hand_size / 0.11
+
         pinches = []
         for i, tip_idx in enumerate(finger_tips):
             dist = self._euclidean_2d(thumb_tip, landmarks[tip_idx])
@@ -151,11 +155,11 @@ class GestureEngine:
                 finger_name, (0.06, 0.08)
             )
 
-            # Hystérésis : seuil différent selon l'état précédent
+            # Hystérésis : seuil différent selon l'état précédent et adapté à la taille de la main (profondeur)
             if prev_pinches[i]:
-                threshold = thresh_release
+                threshold = thresh_release * scale_factor
             else:
-                threshold = thresh_pinch
+                threshold = thresh_pinch * scale_factor
 
             pinches.append(dist < threshold)
 

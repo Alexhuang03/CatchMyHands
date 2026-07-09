@@ -40,7 +40,9 @@ from effects.box_frame import BoxFrameEffect
 from effects.menu_hud import MenuHUDEffect
 from effects.finger_filter import FingerFilterEffect
 from effects.main_menu import MainMenuRenderer
+from effects.games_menu import GamesMenuRenderer
 from core.snake_game import SnakeGame
+from core.pong_game import PongGame
 from utils.fps_counter import FPSCounter
 
 
@@ -140,8 +142,11 @@ class CatchMyHands:
 
         # ── Composants Menu et Jeux ──
         self.main_menu = MainMenuRenderer()
+        self.games_menu = GamesMenuRenderer()
         self.snake_game = SnakeGame()
-        self.state = "MENU"  # "MENU", "FILTERS", "GAMES"
+        self.pong_game = PongGame()
+        self.state = "MENU"  # "MENU", "FILTERS", "GAMES_MENU", "GAME_SNAKE", "GAME_PONG"
+        self.transition_cooldown = 0
         self.width = config.CAMERA_WIDTH
         self.height = config.CAMERA_HEIGHT
 
@@ -207,6 +212,9 @@ class CatchMyHands:
                     print("⚠ Frame perdu, nouvelle tentative...")
                     continue
 
+                if self.transition_cooldown > 0:
+                    self.transition_cooldown -= 1
+
                 # ── Miroir horizontal (plus naturel pour l'utilisateur) ──
                 frame = cv2.flip(frame, 1)
 
@@ -221,7 +229,6 @@ class CatchMyHands:
 
                 for hand_idx in range(num_hands):
                     self._collect_hand_data(hand_idx)
-
                 # ── Rendu selon l'état actuel ──
                 if self.state == "MENU":
                     # Squelettes en arrière-plan si activé
@@ -229,14 +236,25 @@ class CatchMyHands:
                         for hand_data in self._hands_metadata:
                             frame = self.skeleton.render(frame, hand_data["smoothed"], hand_data["handedness"], hand_data["edge_factor"])
                     
-                    frame, menu_action = self.main_menu.render(frame, self._hands_metadata)
+                    frame, menu_action = self.main_menu.render(frame, self._hands_metadata, block_clicks=(self.transition_cooldown > 0))
                     if menu_action == 1:
-                        self.state = "FILTERS"
-                        print("[Navigation] Filtres Visuels")
+                        self.set_state("FILTERS")
                     elif menu_action == 2:
-                        self.state = "GAMES"
+                        self.set_state("GAMES_MENU")
+
+                elif self.state == "GAMES_MENU":
+                    # Squelettes en arrière-plan si activé
+                    if self.show_skeleton:
+                        for hand_data in self._hands_metadata:
+                            frame = self.skeleton.render(frame, hand_data["smoothed"], hand_data["handedness"], hand_data["edge_factor"])
+                    
+                    frame, games_menu_action = self.games_menu.render(frame, self._hands_metadata, block_clicks=(self.transition_cooldown > 0))
+                    if games_menu_action == 1:
+                        self.set_state("GAME_SNAKE")
                         self.snake_game.reset(self.width, self.height)
-                        print("[Navigation] Jeux (Snake)")
+                    elif games_menu_action == 2:
+                        self.set_state("GAME_PONG")
+                        self.pong_game.reset(self.width, self.height)
 
                 elif self.state == "FILTERS":
                     # ── Rendre tous les effets de cadres (bi-manuel ou solo) ──
@@ -251,9 +269,13 @@ class CatchMyHands:
                         self.active_filters_ordered
                     )
 
-                elif self.state == "GAMES":
-                    # Mode Jeux (actuellement Snake)
+                elif self.state == "GAME_SNAKE":
+                    # Mode Jeux (Snake)
                     frame = self.snake_game.update_and_render(frame, self._hands_metadata)
+
+                elif self.state == "GAME_PONG":
+                    # Mode Jeux (Pong)
+                    frame = self.pong_game.update_and_render(frame, self._hands_metadata)
 
                 # ── Affichage ──
                 cv2.imshow("CatchMyHands", frame)
@@ -440,6 +462,7 @@ class CatchMyHands:
                         (100, 100, 255), 1, cv2.LINE_AA)
 
         return frame
+
     def _handle_key(self, key: int) -> bool:
         """
         Gère les entrées clavier.
@@ -451,15 +474,19 @@ class CatchMyHands:
             if self.state == "MENU":
                 print("👋 Au revoir !")
                 return False
-            else:
-                self.state = "MENU"
-                print("[Navigation] Retour au Menu Principal")
+            elif self.state in ["GAMES_MENU", "FILTERS"]:
+                self.set_state("MENU")
+                return True
+            elif self.state in ["GAME_SNAKE", "GAME_PONG"]:
+                self.set_state("GAMES_MENU")
                 return True
 
         elif key == ord('m') or key == ord('M'):
-            if self.state != "MENU":
-                self.state = "MENU"
-                print("[Navigation] Retour au Menu Principal")
+            if self.state in ["GAMES_MENU", "FILTERS"]:
+                self.set_state("MENU")
+                return True
+            elif self.state in ["GAME_SNAKE", "GAME_PONG"]:
+                self.set_state("GAMES_MENU")
                 return True
 
         elif key == ord('d'):
@@ -473,16 +500,19 @@ class CatchMyHands:
             if self.state == "FILTERS":
                 self._toggle_filter("bw")
             elif self.state == "MENU":
-                self.state = "FILTERS"
-                print("[Navigation] Filtres Visuels")
+                self.set_state("FILTERS")
+            elif self.state == "GAMES_MENU":
+                self.set_state("GAME_SNAKE")
+                self.snake_game.reset(self.width, self.height)
 
         elif key == ord('2') or key == ord('é'):
             if self.state == "FILTERS":
                 self._toggle_filter("pixelate")
             elif self.state == "MENU":
-                self.state = "GAMES"
-                self.snake_game.reset(self.width, self.height)
-                print("[Navigation] Jeux (Snake)")
+                self.set_state("GAMES_MENU")
+            elif self.state == "GAMES_MENU":
+                self.set_state("GAME_PONG")
+                self.pong_game.reset(self.width, self.height)
 
         elif key == ord('3') or key == ord('"'):
             if self.state == "FILTERS":
@@ -493,9 +523,12 @@ class CatchMyHands:
                 self._toggle_filter("edge")
 
         elif key == ord('r') or key == ord('R'):
-            if self.state == "GAMES":
+            if self.state == "GAME_SNAKE":
                 self.snake_game.reset(self.width, self.height)
-                print("[Jeu] Partie réinitialisée")
+                print("[Jeu] Snake réinitialisé")
+            elif self.state == "GAME_PONG":
+                self.pong_game.reset(self.width, self.height)
+                print("[Jeu] Pong réinitialisé")
 
         elif key == ord('s'):
             self._take_screenshot()
@@ -555,13 +588,19 @@ class CatchMyHands:
         else:
             print(f"[Screenshot] ❌ Échec de la sauvegarde.")
 
+    def set_state(self, new_state: str):
+        """Met à jour l'état de l'application et réinitialise le cooldown de clic."""
+        if self.state != new_state:
+            self.state = new_state
+            self.transition_cooldown = 30  # Cooldown de 30 frames (~0.5s)
+            print(f"[Navigation] Passage à l'état : {new_state}")
+
 
 def disable_quick_edit():
     """Désactive le QuickEdit Mode dans le terminal Windows pour éviter les blocages lors de clics/frappes."""
     import sys
     if sys.platform.startswith('win'):
         try:
-            import ctypes
             kernel32 = ctypes.windll.kernel32
             # STD_INPUT_HANDLE = -10
             h_input = kernel32.GetStdHandle(-10)

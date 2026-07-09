@@ -38,6 +38,56 @@ class PongGame:
         self.high_score = 0
         self.initialized = False
 
+        # Charger l'image du coeur pixelisé
+        self.heart_full = None
+        self.heart_empty = None
+        self.heart_size = 20
+        self.heart_mask = None
+
+        try:
+            import os
+            # Charger depuis le dossier 'img' ou le dossier courant
+            img_path = "img/pixel-heart.jpg"
+            if not os.path.exists(img_path):
+                # Essayer avec le chemin complet si nécessaire
+                img_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "img", "pixel-heart.jpg")
+
+            heart_img = cv2.imread(img_path)
+            if heart_img is not None:
+                # Convertir en niveaux de gris pour trouver le contour du coeur
+                gray = cv2.cvtColor(heart_img, cv2.COLOR_BGR2GRAY)
+                # Le fond est blanc (proche de 255), on seuille pour isoler le coeur sombre
+                _, thresh = cv2.threshold(gray, 242, 255, cv2.THRESH_BINARY_INV)
+                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if contours:
+                    # Prendre le plus grand contour (le coeur)
+                    c = max(contours, key=cv2.contourArea)
+                    x, y, w_box, h_box = cv2.boundingRect(c)
+                    # Rogner (crop) les bords blancs inutiles
+                    heart_img = heart_img[y:y+h_box, x:x+w_box]
+
+                # Redimensionner en 20x20
+                self.heart_full = cv2.resize(heart_img, (self.heart_size, self.heart_size), interpolation=cv2.INTER_AREA)
+
+                # Masque de transparence (pixels non blancs)
+                gray_heart = cv2.cvtColor(self.heart_full, cv2.COLOR_BGR2GRAY)
+                _, self.heart_mask = cv2.threshold(gray_heart, 242, 255, cv2.THRESH_BINARY_INV)
+
+                # Créer le coeur vide grisé et sombre (couleur gris cyberpunk)
+                grey = cv2.cvtColor(self.heart_full, cv2.COLOR_BGR2GRAY)
+                grey_3ch = cv2.merge([grey, grey, grey])
+                self.heart_empty = (grey_3ch * 0.35).astype(np.uint8)
+        except Exception as e:
+            print(f"[PongGame] Erreur lors du chargement ou du crop du coeur : {e}")
+
+        # Fallback si l'image n'a pas pu être chargée ou traitée
+        if self.heart_full is None:
+            self.heart_full = np.zeros((self.heart_size, self.heart_size, 3), dtype=np.uint8)
+            self.heart_full[:, :] = (0, 0, 255) # Rouge
+            self.heart_mask = np.ones((self.heart_size, self.heart_size), dtype=np.uint8) * 255
+            self.heart_empty = np.zeros((self.heart_size, self.heart_size, 3), dtype=np.uint8)
+            self.heart_empty[:, :] = (60, 60, 60) # Gris
+
     def reset(self, w: int, h: int):
         """Réinitialise une partie de Pong."""
         self.width = w
@@ -377,6 +427,9 @@ class PongGame:
 
     def _update_ball(self, ball: dict) -> str:
         """Met à jour une balle. Retourne 'lost', 'scored', ou 'ok'."""
+        # Sauvegarder la position Y précédente pour l'anti-tunneling
+        prev_y = ball["y"]
+
         ball["x"] += ball["vx"]
         ball["y"] += ball["vy"]
 
@@ -401,16 +454,18 @@ class PongGame:
         p_right = self.paddle_x + self.paddle_width / 2
         p_top = self.paddle_y - self.paddle_height / 2
 
+        # Vérification anti-tunneling par franchissement de ligne
         if (ball["vy"] > 0 and
-                p_top <= by + radius <= self.paddle_y + self.paddle_height / 2 and
+                prev_y + radius <= p_top + 3 and
+                by + radius >= p_top and
                 p_left - 5 <= bx <= p_right + 5):
             ball["y"] = p_top - radius
             # Angle de rebond basé sur où la balle touche la raquette
             hit_pos = (bx - self.paddle_x) / (self.paddle_width / 2)
             hit_pos = max(-1.0, min(1.0, hit_pos))
             speed = math.sqrt(ball["vx"] ** 2 + ball["vy"] ** 2)
-            # Accélérer légèrement
-            speed = min(18.0, speed * 1.02)
+            # Accélérer de +0.5 à chaque rebond
+            speed = min(22.0, speed + 0.5)
             angle = math.radians(-90 + hit_pos * 55)
             ball["vx"] = speed * math.cos(angle)
             ball["vy"] = speed * math.sin(angle)
@@ -421,14 +476,17 @@ class PongGame:
         ai_right = self.ai_paddle_x + self.ai_paddle_width / 2
         ai_bottom = self.ai_paddle_y + self.ai_paddle_height / 2
 
+        # Vérification anti-tunneling par franchissement de ligne
         if (ball["vy"] < 0 and
-                self.ai_paddle_y - self.ai_paddle_height / 2 <= by - radius <= ai_bottom and
+                prev_y - radius >= ai_bottom - 3 and
+                by - radius <= ai_bottom and
                 ai_left - 5 <= bx <= ai_right + 5):
             ball["y"] = ai_bottom + radius
             hit_pos = (bx - self.ai_paddle_x) / (self.ai_paddle_width / 2)
             hit_pos = max(-1.0, min(1.0, hit_pos))
             speed = math.sqrt(ball["vx"] ** 2 + ball["vy"] ** 2)
-            speed = min(18.0, speed * 1.02)
+            # Accélérer de +0.5 à chaque rebond
+            speed = min(22.0, speed + 0.5)
             angle = math.radians(90 + hit_pos * 55)
             ball["vx"] = speed * math.cos(angle)
             ball["vy"] = speed * math.sin(angle)
@@ -573,11 +631,28 @@ class PongGame:
         cv2.putText(frame, score_text, (self.margin_x + 10, self.margin_y - 15),
                     font, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
-        # Vies (cœurs)
-        hearts = "♥ " * self.lives + "♡ " * (3 - self.lives)
-        hearts_color = (0, 128, 255) if self.lives > 1 else (0, 0, 255)
-        cv2.putText(frame, f"VIES: {hearts}", (self.arena_x2 - 200, self.margin_y - 15),
-                    font, 0.5, hearts_color, 2, cv2.LINE_AA)
+        # Vies (cœurs sous forme d'images pixelisées avec masque de transparence)
+        cv2.putText(frame, "VIES: ", (self.arena_x2 - 160, self.margin_y - 15),
+                    font, 0.5, (0, 128, 255) if self.lives > 1 else (0, 0, 255), 2, cv2.LINE_AA)
+        
+        # Position de départ des cœurs (juste après le texte "VIES:")
+        start_x = self.arena_x2 - 100
+        start_y = self.margin_y - 28
+        spacing = 26
+        
+        for i in range(3):
+            px = start_x + i * spacing
+            py = start_y
+            # Choisir l'image (coeur plein ou vide grisé)
+            heart_img = self.heart_full if i < self.lives else self.heart_empty
+            
+            # S'assurer que les coordonnées restent dans les limites du frame
+            if 0 <= px < self.width - self.heart_size and 0 <= py < self.height - self.heart_size:
+                roi = frame[py:py+self.heart_size, px:px+self.heart_size]
+                # Appliquer le masque pour la transparence
+                roi_bg = cv2.bitwise_and(roi, roi, mask=cv2.bitwise_not(self.heart_mask))
+                roi_fg = cv2.bitwise_and(heart_img, heart_img, mask=self.heart_mask)
+                frame[py:py+self.heart_size, px:px+self.heart_size] = cv2.add(roi_bg, roi_fg)
 
         # Power-ups actifs (timers)
         y_offset = self.margin_y - 15
